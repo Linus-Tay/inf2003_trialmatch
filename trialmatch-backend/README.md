@@ -1,29 +1,34 @@
-# TrialMatch Backend Recovery Fast
+# TrialMatch Backend
 
-Replace your current `trialmatch-backend` folder with this folder if your routes got overwritten.
+FastAPI backend for the TrialMatch database project.
 
-## Run
+The backend reads database settings from the root `.env` and optionally from `trialmatch-backend/.env`.
+
+## Run locally
+
+### macOS / Linux
+
+```bash
+cd trialmatch-backend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn main:app --reload
+```
+
+### Windows PowerShell
 
 ```powershell
 cd trialmatch-backend
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-Copy-Item .env.example .env
 uvicorn main:app --reload
 ```
 
-Then open:
+Open:
 
 ```txt
 http://127.0.0.1:8000/docs
-```
-
-You should see:
-
-```txt
-POST /api/auth/login
-POST /api/auth/signup
-GET  /api/dashboard/overview
-GET  /api/trials
+http://127.0.0.1:8000/api/health/db
 ```

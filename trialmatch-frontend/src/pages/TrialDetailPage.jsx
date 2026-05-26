@@ -30,6 +30,7 @@ export default function TrialDetailPage() {
               <Badge>{trial.phase_name}</Badge>
               <Badge>{trial.study_type_name}</Badge>
               <Badge>{trial.sex_name}</Badge>
+              <Badge>{formatHealthyVolunteers(trial.healthy_volunteers)}</Badge>
             </div>
             <p className="text-sm font-semibold text-blue-200">{trial.nct_id}</p>
             <h1 className="mt-3 max-w-4xl text-3xl font-bold leading-tight md:text-4xl">{trial.brief_title}</h1>
@@ -46,11 +47,12 @@ export default function TrialDetailPage() {
         </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-4">
+      <section className="grid gap-4 md:grid-cols-5">
         <Metric label="Criteria" value={trial.total_criteria ?? 0} />
         <Metric label="Inclusion" value={trial.inclusion_count ?? 0} />
         <Metric label="Exclusion" value={trial.exclusion_count ?? 0} />
         <Metric label="Avg complexity" value={trial.avg_complexity_score ?? "—"} />
+        <Metric label="Healthy volunteers" value={formatHealthyVolunteers(trial.healthy_volunteers)} />
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
@@ -103,4 +105,10 @@ function Metric({ label, value }) {
 
 function Panel({ title, children }) {
   return <section className="glass-card rounded-[2rem] p-6"><h2 className="mb-4 text-xl font-bold text-slate-950">{title}</h2>{children}</section>;
+}
+
+function formatHealthyVolunteers(value) {
+  if (value === true || value === 1) return "Healthy volunteers accepted";
+  if (value === false || value === 0) return "Patients only";
+  return "Unknown volunteer status";
 }

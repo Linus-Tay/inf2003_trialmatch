@@ -11,6 +11,7 @@
     "lucide-react": "latest",
     "react": "latest",
     "react-dom": "latest",
+    "react-is": "^19.2.6",
     "react-router-dom": "latest",
     "recharts": "latest"
   },

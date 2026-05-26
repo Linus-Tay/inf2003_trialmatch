@@ -16,10 +16,11 @@ export default function TrialCard({ trial, onSave }) {
           </div>
           <h3 className="line-clamp-2 text-lg font-bold leading-snug text-slate-950">{trial.brief_title}</h3>
           <p className="mt-2 text-sm text-slate-500">{trial.nct_id}</p>
-          <div className="mt-4 grid gap-3 text-sm text-slate-600 sm:grid-cols-3">
+          <div className="mt-4 grid gap-3 text-sm text-slate-600 sm:grid-cols-4">
             <Meta label="Criteria" value={trial.criteria_count ?? 0} />
             <Meta label="Conditions" value={trial.condition_count ?? 0} />
             <Meta label="Age" value={`${trial.minimum_age ?? "?"}–${trial.maximum_age ?? "?"}`} />
+            <Meta label="Healthy volunteers" value={formatHealthyVolunteers(trial.healthy_volunteers)} />
           </div>
         </div>
 
@@ -55,4 +56,10 @@ function Meta({ label, value }) {
       <p className="font-semibold text-slate-800">{value}</p>
     </div>
   );
+}
+
+function formatHealthyVolunteers(value) {
+  if (value === true || value === 1) return "Yes";
+  if (value === false || value === 0) return "No";
+  return "Unknown";
 }

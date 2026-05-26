@@ -1,14 +1,18 @@
 USE trialmatch_db;
 
-INSERT INTO user_roles (role_name, description) VALUES
-('Patient', 'Demo patient user who searches and saves trials.'),
-('Researcher', 'Researcher user who manages trial records.'),
-('Admin', 'Data steward/admin user who reviews data quality and database demos.');
+-- ============================================================
+-- Seed controlled lookup values only.
+-- No application users, demo trials, patient profiles, saved
+-- trials, matches, or sample clinical records are inserted here.
+-- Real application users are created through the signup route.
+-- Real clinical trial records are imported by the ETL scripts from
+-- the cleaned dataset.
+-- ============================================================
 
-INSERT INTO app_users (role_id, full_name, email) VALUES
-(1, 'Demo Patient', 'patient@trialmatch.local'),
-(2, 'Demo Researcher', 'researcher@trialmatch.local'),
-(3, 'Demo Admin', 'admin@trialmatch.local');
+INSERT INTO user_roles (role_name, description) VALUES
+('Patient', 'Patient-facing user who searches, matches, and saves trials.'),
+('Researcher', 'Researcher user who manages and reviews trial records.'),
+('Admin', 'Data steward/admin user who reviews data quality and database evidence.');
 
 INSERT INTO trial_phases (phase_name, phase_order) VALUES
 ('Not Applicable', 0),

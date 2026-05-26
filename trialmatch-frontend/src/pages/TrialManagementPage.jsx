@@ -31,6 +31,7 @@ export default function TrialManagementPage() {
     minimum_age: "",
     maximum_age: "",
     enrollment_count: "",
+    healthy_volunteers: "",
   });
 
   const [editForm, setEditForm] = useState({});
@@ -58,6 +59,7 @@ export default function TrialManagementPage() {
       minimum_age: detail.trial.minimum_age ?? "",
       maximum_age: detail.trial.maximum_age ?? "",
       enrollment_count: detail.trial.enrollment_count ?? "",
+      healthy_volunteers: detail.trial.healthy_volunteers === null || detail.trial.healthy_volunteers === undefined ? "" : String(Boolean(detail.trial.healthy_volunteers)),
       source_url: detail.trial.source_url || "",
     });
   }
@@ -83,10 +85,11 @@ export default function TrialManagementPage() {
       minimum_age: createForm.minimum_age ? Number(createForm.minimum_age) : null,
       maximum_age: createForm.maximum_age ? Number(createForm.maximum_age) : null,
       enrollment_count: createForm.enrollment_count ? Number(createForm.enrollment_count) : null,
+      healthy_volunteers: createForm.healthy_volunteers === "" ? null : createForm.healthy_volunteers === "true",
     });
 
     setMessage("Trial created.");
-    setCreateForm({ nct_id: "", brief_title: "", phase_id: "", status_id: "", study_type_id: "", sex_id: "", minimum_age: "", maximum_age: "", enrollment_count: "" });
+    setCreateForm({ nct_id: "", brief_title: "", phase_id: "", status_id: "", study_type_id: "", sex_id: "", minimum_age: "", maximum_age: "", enrollment_count: "", healthy_volunteers: "" });
     load();
   }
 
@@ -99,6 +102,7 @@ export default function TrialManagementPage() {
       minimum_age: editForm.minimum_age === "" ? null : Number(editForm.minimum_age),
       maximum_age: editForm.maximum_age === "" ? null : Number(editForm.maximum_age),
       enrollment_count: editForm.enrollment_count === "" ? null : Number(editForm.enrollment_count),
+      healthy_volunteers: editForm.healthy_volunteers === "" ? null : editForm.healthy_volunteers === "true",
     });
 
     setMessage("Trial updated.");
@@ -181,6 +185,11 @@ export default function TrialManagementPage() {
             <option value="">Sex eligibility</option>
             {lookups.sexes.map((item) => <option key={item.sex_id} value={item.sex_id}>{item.sex_name}</option>)}
           </select>
+          <select className="form-input" name="healthy_volunteers" value={createForm.healthy_volunteers} onChange={updateCreate}>
+            <option value="">Healthy volunteer eligibility</option>
+            <option value="true">Accepts healthy volunteers</option>
+            <option value="false">Patients only / condition-specific</option>
+          </select>
           <input className="form-input" name="minimum_age" type="number" placeholder="Minimum age" value={createForm.minimum_age} onChange={updateCreate} />
           <input className="form-input" name="maximum_age" type="number" placeholder="Maximum age" value={createForm.maximum_age} onChange={updateCreate} />
           <button className="primary-button md:col-span-3"><Plus size={18} />Create trial</button>
@@ -221,6 +230,11 @@ export default function TrialManagementPage() {
                   <input className="form-input" name="brief_title" value={editForm.brief_title || ""} onChange={updateEdit} />
                   <input className="form-input" name="official_title" placeholder="Official title" value={editForm.official_title || ""} onChange={updateEdit} />
                   <textarea className="form-input min-h-28" name="brief_summary" placeholder="Summary" value={editForm.brief_summary || ""} onChange={updateEdit} />
+                  <select className="form-input" name="healthy_volunteers" value={editForm.healthy_volunteers ?? ""} onChange={updateEdit}>
+                    <option value="">Healthy volunteer eligibility unknown</option>
+                    <option value="true">Accepts healthy volunteers</option>
+                    <option value="false">Patients only / condition-specific</option>
+                  </select>
                   <button className="primary-button"><Save size={18} />Save trial update</button>
                 </form>
               </section>

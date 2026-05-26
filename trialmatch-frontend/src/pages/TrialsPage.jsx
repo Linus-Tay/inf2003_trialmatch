@@ -7,7 +7,7 @@ import TrialCard from "../components/TrialCard";
 
 export default function TrialsPage() {
   const [lookups, setLookups] = useState({ phases: [], statuses: [], sexes: [] });
-  const [filters, setFilters] = useState({ q: "", condition: "", keyword: "", status: "", phase: "", sex: "" });
+  const [filters, setFilters] = useState({ q: "", condition: "", keyword: "", status: "", phase: "", sex: "", healthy_volunteers: "" });
   const [results, setResults] = useState({ total: 0, trials: [] });
   const [isLoading, setIsLoading] = useState(false);
 
@@ -32,6 +32,7 @@ export default function TrialsPage() {
         status: filters.status || undefined,
         phase: filters.phase || undefined,
         sex: filters.sex || undefined,
+        healthy_volunteers: filters.healthy_volunteers || undefined,
       });
       setResults(data);
     } finally {
@@ -76,6 +77,12 @@ export default function TrialsPage() {
           <select className="form-input" name="sex" value={filters.sex} onChange={updateField}>
             <option value="">Any sex</option>
             {lookups.sexes.map((item) => <option key={item.sex_id} value={item.sex_name}>{item.sex_name}</option>)}
+          </select>
+
+          <select className="form-input" name="healthy_volunteers" value={filters.healthy_volunteers} onChange={updateField}>
+            <option value="">Any volunteer type</option>
+            <option value="true">Accepts healthy volunteers</option>
+            <option value="false">Patients only / condition-specific</option>
           </select>
 
           <button className="primary-button md:col-span-3 xl:col-span-6" disabled={isLoading}>

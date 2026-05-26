@@ -46,6 +46,7 @@ class TrialCreate(BaseModel):
     sex_id: int | None = None
     minimum_age: int | None = Field(default=None, ge=0, le=120)
     maximum_age: int | None = Field(default=None, ge=0, le=120)
+    healthy_volunteers: bool | None = None
     enrollment_count: int | None = Field(default=None, ge=0)
     source_url: str | None = None
 
@@ -62,6 +63,7 @@ class TrialUpdate(BaseModel):
     sex_id: int | None = None
     minimum_age: int | None = Field(default=None, ge=0, le=120)
     maximum_age: int | None = Field(default=None, ge=0, le=120)
+    healthy_volunteers: bool | None = None
     enrollment_count: int | None = Field(default=None, ge=0)
     source_url: str | None = None
     is_archived: bool | None = None
@@ -105,7 +107,7 @@ class TrialCriteriaUpdate(BaseModel):
 
 
 class PatientProfileCreate(BaseModel):
-    """Request body for creating a demo patient profile."""
+    """Request body for creating a patient profile used for matching."""
 
     profile_name: str = Field(min_length=2, max_length=150)
     age: int = Field(ge=0, le=120)

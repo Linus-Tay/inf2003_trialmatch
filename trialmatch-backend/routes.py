@@ -181,7 +181,7 @@ def dashboard_overview(
             SELECT
                 t.trial_id, t.nct_id, t.brief_title,
                 tp.phase_name, ts.status_name, se.sex_name,
-                t.minimum_age, t.maximum_age,
+                t.minimum_age, t.maximum_age, t.healthy_volunteers,
                 cache.criteria_count, cache.condition_count
             FROM trials t
             LEFT JOIN trial_phases tp ON t.phase_id = tp.phase_id
@@ -290,6 +290,7 @@ def search_trials(
     sex: str | None = Query(default=None),
     min_age: int | None = Query(default=None, ge=0, le=120),
     max_age: int | None = Query(default=None, ge=0, le=120),
+    healthy_volunteers: bool | None = Query(default=None),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     current_user: dict = Depends(get_current_user),
@@ -329,6 +330,10 @@ def search_trials(
     if max_age is not None:
         where.append("(t.minimum_age IS NULL OR t.minimum_age <= %s)")
         params.append(max_age)
+
+    if healthy_volunteers is not None:
+        where.append("t.healthy_volunteers = %s")
+        params.append(healthy_volunteers)
 
     if condition:
         like = f"%{condition.strip()}%"
@@ -380,7 +385,7 @@ def search_trials(
             SELECT
                 t.trial_id, t.nct_id, t.brief_title,
                 tp.phase_name, ts.status_name, sty.study_type_name, se.sex_name,
-                t.minimum_age, t.maximum_age, t.enrollment_count,
+                t.minimum_age, t.maximum_age, t.healthy_volunteers, t.enrollment_count,
                 COALESCE(cache.condition_count, 0) AS condition_count,
                 COALESCE(cache.intervention_count, 0) AS intervention_count,
                 COALESCE(cache.criteria_count, 0) AS criteria_count,
@@ -418,6 +423,7 @@ def search_trials(
                         "sex": sex,
                         "min_age": min_age,
                         "max_age": max_age,
+                        "healthy_volunteers": healthy_volunteers,
                         "condition": condition,
                         "keyword": keyword,
                     }
@@ -442,7 +448,7 @@ def get_saved_trials(
                 st.saved_trial_id, st.saved_status, st.notes, st.saved_at,
                 t.trial_id, t.nct_id, t.brief_title,
                 tp.phase_name, ts.status_name, se.sex_name,
-                t.minimum_age, t.maximum_age,
+                t.minimum_age, t.maximum_age, t.healthy_volunteers,
                 COALESCE(cache.criteria_count, 0) AS criteria_count,
                 COALESCE(cache.condition_count, 0) AS condition_count
             FROM saved_trials st
@@ -476,7 +482,7 @@ def get_trial_detail(
                 t.brief_summary, t.source_url,
                 p.phase_name, s.status_name, s.is_open_to_recruitment,
                 st.study_type_name, sex.sex_name,
-                t.minimum_age, t.maximum_age, t.enrollment_count,
+                t.minimum_age, t.maximum_age, t.healthy_volunteers, t.enrollment_count,
                 COALESCE(cache.criteria_count, 0) AS total_criteria,
                 COALESCE(cache.inclusion_count, 0) AS inclusion_count,
                 COALESCE(cache.exclusion_count, 0) AS exclusion_count,
@@ -552,7 +558,7 @@ def get_trial_detail(
 
     raw_doc = mongo_db.raw_trial_documents.find_one(
         {"trial_id": trial_id},
-        {"_id": 0, "dataset_name": 1, "raw.criteria_split_status": 1, "raw.source_condition_query": 1},
+        {"_id": 0, "dataset_name": 1, "raw.criteria_split_status": 1, "raw.source_condition_query": 1, "raw.healthy_volunteers": 1},
     )
 
     return {
@@ -645,7 +651,7 @@ def management_list_trials(
             f"""
             SELECT
                 trial_id, nct_id, brief_title, minimum_age, maximum_age,
-                enrollment_count, is_archived, created_at, updated_at
+                healthy_volunteers, enrollment_count, is_archived, created_at, updated_at
             FROM trials
             {where_sql}
             ORDER BY updated_at DESC
@@ -670,9 +676,9 @@ def management_create_trial(
             INSERT INTO trials (
                 nct_id, brief_title, official_title, brief_summary,
                 phase_id, status_id, study_type_id, sex_id,
-                minimum_age, maximum_age, enrollment_count, source_url
+                minimum_age, maximum_age, healthy_volunteers, enrollment_count, source_url
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 payload.nct_id.strip(),
@@ -685,6 +691,7 @@ def management_create_trial(
                 payload.sex_id,
                 payload.minimum_age,
                 payload.maximum_age,
+                payload.healthy_volunteers,
                 payload.enrollment_count,
                 payload.source_url,
             ),
@@ -861,7 +868,7 @@ def generate_matches(
                 t.trial_id, t.nct_id, t.brief_title,
                 p.phase_name, s.status_name,
                 sex.sex_name AS trial_sex,
-                t.minimum_age, t.maximum_age,
+                t.minimum_age, t.maximum_age, t.healthy_volunteers,
                 matched.matched_condition_count,
                 cache.avg_complexity_score,
                 COALESCE(cache.manual_review_count, 0) AS manual_review_count,
@@ -1045,12 +1052,30 @@ def clinical_analytics(
         )
         age_buckets = cursor.fetchall()
 
+        cursor.execute(
+            """
+            SELECT
+                CASE
+                    WHEN healthy_volunteers = TRUE THEN 'Accepts healthy volunteers'
+                    WHEN healthy_volunteers = FALSE THEN 'Patients/condition-specific only'
+                    ELSE 'Unspecified'
+                END AS label,
+                COUNT(*) AS value
+            FROM trials
+            WHERE is_archived = FALSE
+            GROUP BY label
+            ORDER BY value DESC
+            """
+        )
+        healthy_volunteer_distribution = cursor.fetchall()
+
     return {
         "statuses": statuses,
         "phases": phases,
         "study_types": study_types,
         "sexes": sexes,
         "age_buckets": age_buckets,
+        "healthy_volunteer_distribution": healthy_volunteer_distribution,
     }
 
 

@@ -6,7 +6,7 @@ import { fetchClinicalAnalytics } from "../api/modules";
 import PageHeader from "../components/PageHeader";
 
 export default function AnalyticsPage() {
-  const [data, setData] = useState({ statuses: [], phases: [], study_types: [], sexes: [], age_buckets: [] });
+  const [data, setData] = useState({ statuses: [], phases: [], study_types: [], sexes: [], age_buckets: [], healthy_volunteer_distribution: [] });
 
   useEffect(() => { fetchClinicalAnalytics().then(setData); }, []);
 
@@ -16,7 +16,7 @@ export default function AnalyticsPage() {
         icon={BarChart3}
         eyebrow="Clinical Trial Analytics Dashboard"
         title="Visualise recruitment status, phase, study type, age and sex eligibility."
-        description="This page turns SQL GROUP BY queries and views into chart-ready API results."
+description="This page turns SQL GROUP BY queries and views into chart-ready API results, including patient/healthy-volunteer eligibility distribution."
       />
       <ChartPanel title="Trial status" data={data.statuses} />
       <div className="grid gap-6 xl:grid-cols-2">
@@ -24,6 +24,7 @@ export default function AnalyticsPage() {
         <ChartPanel title="Study type" data={data.study_types} />
         <ChartPanel title="Sex eligibility" data={data.sexes} />
         <ChartPanel title="Age bucket" data={data.age_buckets} />
+        <ChartPanel title="Healthy volunteer eligibility" data={data.healthy_volunteer_distribution} />
       </div>
     </div>
   );

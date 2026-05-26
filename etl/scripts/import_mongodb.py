@@ -16,6 +16,13 @@ CRITERIA_CSV = BASE_DIR / "data" / "eligibility_criteria_chunks.csv"
 BATCH_SIZE = 1000
 
 
+def parse_optional_limit(env_name: str) -> int | None:
+    raw = os.getenv(env_name)
+    if raw is None or raw.strip().lower() in {"", "none", "null", "all"}:
+        return None
+    return int(raw)
+
+
 def get_mariadb_connection():
     return pymysql.connect(
         host=os.getenv("MARIADB_HOST", "localhost"),
@@ -55,7 +62,13 @@ def get_nct_to_trial_id():
         conn.close()
 
 
-def import_raw_trial_documents(db, nct_to_trial_id, limit=5000):
+def import_raw_trial_documents(db, nct_to_trial_id, limit=None):
+    """Preserve source trial rows as MongoDB documents.
+
+    MariaDB stores normalized operational columns. MongoDB keeps the raw and
+    derived source fields for traceability, retrieval, and future NLP work.
+    """
+
     print("Importing raw trial documents into MongoDB...")
 
     operations = []
@@ -92,10 +105,16 @@ def import_raw_trial_documents(db, nct_to_trial_id, limit=5000):
                     "sex": clean_value(row.get("sex")),
                     "minimum_age": clean_value(row.get("minimum_age")),
                     "maximum_age": clean_value(row.get("maximum_age")),
+                    "healthy_volunteers": clean_value(row.get("healthy_volunteers")),
                     "eligibility_criteria": clean_value(row.get("eligibility_criteria")),
                     "inclusion_criteria": clean_value(row.get("inclusion_criteria")),
                     "exclusion_criteria": clean_value(row.get("exclusion_criteria")),
                     "criteria_split_status": clean_value(row.get("criteria_split_status")),
+                    "combined_text_for_retrieval": clean_value(row.get("combined_text_for_retrieval")),
+                    "has_eligibility_criteria": clean_value(row.get("has_eligibility_criteria")),
+                    "eligibility_criteria_length": clean_value(row.get("eligibility_criteria_length")),
+                    "inclusion_criteria_length": clean_value(row.get("inclusion_criteria_length")),
+                    "exclusion_criteria_length": clean_value(row.get("exclusion_criteria_length")),
                     "clinicaltrials_url": clean_value(row.get("clinicaltrials_url")),
                 },
             }
@@ -120,7 +139,13 @@ def import_raw_trial_documents(db, nct_to_trial_id, limit=5000):
     print(f"Raw trial documents imported: {processed}")
 
 
-def import_parsed_criteria_documents(db, nct_to_trial_id, limit=50000):
+def import_parsed_criteria_documents(db, nct_to_trial_id, limit=None):
+    """Store split criteria as nested arrays grouped by trial.
+
+    This demonstrates a document model: one trial document can contain many
+    criteria items with flexible analysis fields.
+    """
+
     print("Importing parsed criteria documents into MongoDB...")
 
     criteria_by_trial = {}
@@ -221,8 +246,11 @@ def main():
     db = get_mongo_db()
     nct_to_trial_id = get_nct_to_trial_id()
 
-    import_raw_trial_documents(db, nct_to_trial_id, limit=5000)
-    import_parsed_criteria_documents(db, nct_to_trial_id, limit=50000)
+    raw_limit = parse_optional_limit("MONGO_RAW_IMPORT_LIMIT")
+    criteria_limit = parse_optional_limit("MONGO_CRITERIA_IMPORT_LIMIT")
+
+    import_raw_trial_documents(db, nct_to_trial_id, limit=raw_limit)
+    import_parsed_criteria_documents(db, nct_to_trial_id, limit=criteria_limit)
 
     print("MongoDB import completed.")
 

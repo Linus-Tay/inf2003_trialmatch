@@ -1,4 +1,3 @@
-import time
 from datetime import datetime
 from typing import Any
 
@@ -129,7 +128,7 @@ def refresh_condition_summary_for_condition(cursor, condition_id: int):
 
 
 def get_first_lookup_id(cursor, table_name: str, id_column: str) -> int:
-    """Fetch the first lookup ID for safe demo inserts."""
+    """Fetch the first lookup ID for safe validation checks."""
 
     cursor.execute(f"SELECT {id_column} AS id_value FROM {table_name} ORDER BY {id_column} LIMIT 1")
     row = cursor.fetchone()
@@ -307,7 +306,7 @@ def add_trial_criteria(
     computed_score = (
         payload.complexity_score
         if payload.complexity_score is not None
-        else min(100, round((text_length / 10) + (payload.keyword_count * 3), 2))
+        else min(99.99, round(text_length / 20, 2))
     )
 
     with conn.cursor() as cursor:
@@ -359,7 +358,10 @@ def update_trial_criteria(
     update_data = payload.model_dump(exclude_unset=True)
 
     if "criteria_text" in update_data and update_data["criteria_text"] is not None:
-        update_data["text_length"] = len(update_data["criteria_text"])
+        text_length = len(update_data["criteria_text"])
+        update_data["text_length"] = text_length
+        if "complexity_score" not in update_data or update_data["complexity_score"] is None:
+            update_data["complexity_score"] = min(99.99, round(text_length / 20, 2))
 
     if not update_data:
         return {"message": "Nothing to update."}
@@ -524,7 +526,7 @@ def database_demo_views(
     conn: Connection = Depends(get_mariadb),
     current_user: dict = Depends(get_current_user),
 ):
-    """Return sample rows from SQL views used in the project demonstration."""
+    """Return limited preview rows from SQL views used in the project evidence."""
 
     return {
         "trial_summary_view": fetch_optional_view(
@@ -607,80 +609,86 @@ def trigger_test_match_status(
     conn: Connection = Depends(get_mariadb),
     current_user: dict = Depends(get_current_user),
 ):
-    """Test match status and match history trigger behaviour."""
+    """Test match-status trigger behaviour without persisting test rows.
 
-    with conn.cursor() as cursor:
-        cursor.execute(
-            """
-            SELECT patient_profile_id
-            FROM patient_profiles
-            WHERE created_by_user_id = %s
-            LIMIT 1
-            """,
-            (current_user["user_id"],),
-        )
-        profile = cursor.fetchone()
+    The route runs inside a transaction and always rolls back before returning.
+    This demonstrates trigger behaviour without adding artificial records to the
+    final dataset-backed database.
+    """
 
-        if not profile:
-            sex_id = get_first_lookup_id(cursor, "sex_eligibilities", "sex_id")
+    try:
+        with conn.cursor() as cursor:
             cursor.execute(
                 """
-                INSERT INTO patient_profiles (
-                    created_by_user_id,
-                    profile_name,
-                    age,
-                    sex_id,
-                    notes
-                )
-                VALUES (%s, 'Trigger Demo Profile', 30, %s, 'Created for trigger demonstration.')
+                SELECT patient_profile_id
+                FROM patient_profiles
+                WHERE created_by_user_id = %s
+                LIMIT 1
                 """,
-                (current_user["user_id"], sex_id),
+                (current_user["user_id"],),
             )
-            profile = {"patient_profile_id": cursor.lastrowid}
+            profile = cursor.fetchone()
 
-        cursor.execute("SELECT trial_id FROM trials WHERE is_archived = FALSE LIMIT 1")
-        trial = cursor.fetchone()
+            if not profile:
+                sex_id = get_first_lookup_id(cursor, "sex_eligibilities", "sex_id")
+                cursor.execute(
+                    """
+                    INSERT INTO patient_profiles (
+                        created_by_user_id,
+                        profile_name,
+                        age,
+                        sex_id,
+                        notes
+                    )
+                    VALUES (%s, 'Rollback Trigger Check Profile', 30, %s, 'Temporary row rolled back by the trigger check route.')
+                    """,
+                    (current_user["user_id"], sex_id),
+                )
+                profile = {"patient_profile_id": cursor.lastrowid}
 
-        if not trial:
-            raise HTTPException(status_code=400, detail="No active trial found.")
+            cursor.execute("SELECT trial_id FROM trials WHERE is_archived = FALSE LIMIT 1")
+            trial = cursor.fetchone()
 
-        cursor.execute(
-            """
-            INSERT INTO patient_trial_matches (
-                patient_profile_id,
-                trial_id,
-                structured_match_passed,
-                criteria_review_required,
-                match_score,
-                match_status
+            if not trial:
+                conn.rollback()
+                raise HTTPException(status_code=400, detail="No active trial found.")
+
+            cursor.execute(
+                """
+                INSERT INTO patient_trial_matches (
+                    patient_profile_id,
+                    trial_id,
+                    structured_match_passed,
+                    criteria_review_required,
+                    match_score,
+                    match_status
+                )
+                VALUES (%s, %s, TRUE, FALSE, 88, 'Needs Review')
+                ON DUPLICATE KEY UPDATE
+                    structured_match_passed = TRUE,
+                    criteria_review_required = FALSE,
+                    match_score = 88,
+                    match_status = 'Needs Review',
+                    matched_at = CURRENT_TIMESTAMP
+                """,
+                (profile["patient_profile_id"], trial["trial_id"]),
             )
-            VALUES (%s, %s, TRUE, FALSE, 88, 'Needs Review')
-            ON DUPLICATE KEY UPDATE
-                structured_match_passed = TRUE,
-                criteria_review_required = FALSE,
-                match_score = 88,
-                match_status = 'Needs Review',
-                matched_at = CURRENT_TIMESTAMP
-            """,
-            (profile["patient_profile_id"], trial["trial_id"]),
-        )
 
-        cursor.execute(
-            """
-            SELECT
-                match_id,
-                match_score,
-                structured_match_passed,
-                criteria_review_required,
-                match_status
-            FROM patient_trial_matches
-            WHERE patient_profile_id = %s AND trial_id = %s
-            """,
-            (profile["patient_profile_id"], trial["trial_id"]),
-        )
-        match_row = cursor.fetchone()
+            cursor.execute(
+                """
+                SELECT
+                    match_id,
+                    match_score,
+                    structured_match_passed,
+                    criteria_review_required,
+                    match_status
+                FROM patient_trial_matches
+                WHERE patient_profile_id = %s AND trial_id = %s
+                """,
+                (profile["patient_profile_id"], trial["trial_id"]),
+            )
+            match_row = cursor.fetchone()
 
-        try:
             cursor.execute(
                 """
                 SELECT *
@@ -692,11 +700,19 @@ def trigger_test_match_status(
                 (match_row["match_id"],),
             )
             history = cursor.fetchall()
-        except Exception as exc:
-            history = [{"error": str(exc), "note": "match_status_history table may not exist."}]
 
-    conn.commit()
-    return {"message": "Match trigger demo completed.", "match": match_row, "history": history}
+        conn.rollback()
+        return {
+            "message": "Match trigger check completed and rolled back. No test records were kept.",
+            "rolled_back": True,
+            "match": match_row,
+            "history": history,
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Trigger check rolled back: {exc}")
 
 
 @router.post("/database-demo/transaction-demo/create-trial")
@@ -704,10 +720,14 @@ def transaction_demo_create_trial(
     conn: Connection = Depends(get_mariadb),
     current_user: dict = Depends(get_current_user),
 ):
-    """Create a trial, condition link and criteria row in one transaction."""
+    """Demonstrate a multi-table transaction without keeping test rows.
 
-    unique_suffix = int(time.time())
-    nct_id = f"DEMO{unique_suffix}"
+    The temporary trial, condition link, and criterion are inserted only inside
+    the current transaction. The route then rolls back deliberately so the
+    database remains dataset-backed and free from artificial records.
+    """
+
+    nct_id = "ROLLBACK_CHECK_TRIAL"
 
     try:
         with conn.cursor() as cursor:
@@ -727,15 +747,16 @@ def transaction_demo_create_trial(
                     sex_id,
                     minimum_age,
                     maximum_age,
+                    healthy_volunteers,
                     enrollment_count
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, 18, 65, 100)
+                VALUES (%s, %s, %s, %s, %s, %s, 18, 65, TRUE, 100)
                 """,
-                (nct_id, "Transaction Demo Trial", phase_id, status_id, study_type_id, sex_id),
+                (nct_id, "Rollback Transaction Check Trial", phase_id, status_id, study_type_id, sex_id),
             )
             trial_id = cursor.lastrowid
 
-            condition_name = "Transaction Demo Condition"
+            condition_name = "Rollback Transaction Check Condition"
             condition_normalised = normalise_name(condition_name)
 
             cursor.execute(
@@ -752,7 +773,7 @@ def transaction_demo_create_trial(
 
             cursor.execute("INSERT INTO trial_conditions (trial_id, condition_id) VALUES (%s, %s)", (trial_id, condition_id))
 
-            criteria_text = "Participant must be eligible for the transaction demo trial."
+            criteria_text = "Participant must be eligible for the rollback transaction check."
 
             cursor.execute(
                 """
@@ -774,17 +795,18 @@ def transaction_demo_create_trial(
             refresh_trial_cache_for_trial(cursor, trial_id)
             refresh_condition_summary_for_condition(cursor, condition_id)
 
-        conn.commit()
+        conn.rollback()
 
         return {
             "transaction_success": True,
-            "message": "Trial, condition link and criteria row inserted in one transaction.",
-            "trial_id": trial_id,
-            "nct_id": nct_id,
+            "rolled_back": True,
+            "message": "Transaction check succeeded and was rolled back. No temporary rows were kept.",
+            "temporary_trial_id": trial_id,
+            "temporary_nct_id": nct_id,
         }
     except Exception as exc:
         conn.rollback()
-        raise HTTPException(status_code=500, detail=f"Transaction rolled back: {exc}")
+        raise HTTPException(status_code=500, detail=f"Transaction check rolled back: {exc}")
 
 
 @router.get("/database-demo/index-performance")
