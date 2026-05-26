@@ -1,0 +1,29 @@
+# Env
+.env
+**/.env
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Node
+node_modules/
+dist/
+
+# Docker/database runtime
+mariadb-data/
+mongo-data/
+*.db
+*.sqlite
+
+# Large datasets
+etl/data/*.csv
+
+# Keep data folder
+!etl/data/.gitkeep
+!etl/data/README.md
+
+# Archives
+*.zip

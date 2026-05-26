@@ -1,0 +1,5 @@
+pandas
+pymysql
+python-dotenv
+pymongo
+tqdm
