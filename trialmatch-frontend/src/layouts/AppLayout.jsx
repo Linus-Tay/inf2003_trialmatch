@@ -123,12 +123,14 @@ export default function AppLayout() {
           <button
             type="button"
             onClick={() => collapsed && setShowProfile(!showProfile)}
-            className={`rounded-3xl border border-slate-200 bg-white/70 p-4 ${
-              collapsed ? "mx-auto block" : "w-full"
+            className={`border border-slate-200 bg-white/70 transition ${
+              collapsed
+                ? "mx-auto flex h-12 w-12 items-center justify-center rounded-2xl p-0"
+                : "w-full rounded-3xl p-4"
             }`}
           >
-            <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
-              <Database size={18} />
+            <div className="mx-auto flex h-8 w-8 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
+              {user?.full_name?.charAt(0)}
             </div>
 
             {!collapsed && (
