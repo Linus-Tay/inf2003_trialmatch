@@ -44,6 +44,7 @@ const navGroups = [
 
 export default function AppLayout() {
   const [collapsed, setCollapsed] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
@@ -63,7 +64,7 @@ export default function AppLayout() {
       <motion.aside
         animate={{ width: collapsed ? 92 : 300 }}
         transition={{ type: "spring", stiffness: 220, damping: 28 }}
-        className="fixed inset-y-0 left-0 z-40 hidden border-r border-white/70 bg-white/75 p-5 shadow-soft backdrop-blur-2xl lg:block"
+        className="fixed inset-y-0 left-0 z-40 hidden border-r border-white/70 bg-white/75 p-5 shadow-soft backdrop-blur-2xl lg:flex lg:flex-col"
       >
         <button
           onClick={() => setCollapsed((current) => !current)}
@@ -88,7 +89,7 @@ export default function AppLayout() {
           </AnimatePresence>
         </div>
 
-        <nav className="mt-8 space-y-7">
+        <nav className="mt-8 max-h-[calc(100vh-260px)] space-y-7 overflow-y-auto pb-4">
           {navGroups.map((group) => (
             <div key={group.title}>
               {!collapsed && <p className="mb-2 px-3 text-xs font-bold uppercase tracking-[0.22em] text-slate-400">{group.title}</p>}
@@ -118,8 +119,14 @@ export default function AppLayout() {
           ))}
         </nav>
 
-        <div className="absolute bottom-5 left-5 right-5">
-          <div className={`rounded-3xl border border-slate-200 bg-white/70 p-4 ${collapsed ? "text-center" : ""}`}>
+        <div className="mt-6 relative">
+          <button
+            type="button"
+            onClick={() => collapsed && setShowProfile(!showProfile)}
+            className={`rounded-3xl border border-slate-200 bg-white/70 p-4 ${
+              collapsed ? "mx-auto block" : "w-full"
+            }`}
+          >
             <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
               <Database size={18} />
             </div>
@@ -128,15 +135,27 @@ export default function AppLayout() {
               <div className="mt-3">
                 <p className="font-semibold text-slate-950">{user?.full_name}</p>
                 <p className="mt-1 truncate text-xs text-slate-500">{user?.email}</p>
-                <p className="mt-3 inline-flex rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">{user?.role_name}</p>
+                <p className="mt-3 inline-flex rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                  {user?.role_name}
+                </p>
               </div>
             )}
-          </div>
+          </button>
+
+          {collapsed && showProfile && (
+            <div className="absolute bottom-0 left-[70px] z-50 w-56 rounded-3xl border border-slate-200 bg-white p-4 shadow-xl">
+              <p className="font-semibold text-slate-950">{user?.full_name}</p>
+              <p className="mt-1 text-xs text-slate-500">{user?.email}</p>
+              <p className="mt-3 inline-flex rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                {user?.role_name}
+              </p>
+            </div>
+          )}  
 
           <button
             onClick={handleLogout}
             className={`mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-red-50 hover:text-red-700 ${
-              collapsed ? "px-0" : ""
+              collapsed ? "mx-auto w-14 px-0" : ""
             }`}
           >
             <LogOut size={16} />
