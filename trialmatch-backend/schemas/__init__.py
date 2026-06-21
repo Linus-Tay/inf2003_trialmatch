@@ -47,7 +47,6 @@ class TrialCreate(BaseModel):
     minimum_age: int | None = Field(default=None, ge=0, le=120)
     maximum_age: int | None = Field(default=None, ge=0, le=120)
     healthy_volunteers: bool | None = None
-    enrollment_count: int | None = Field(default=None, ge=0)
     source_url: str | None = None
 
 
@@ -64,7 +63,6 @@ class TrialUpdate(BaseModel):
     minimum_age: int | None = Field(default=None, ge=0, le=120)
     maximum_age: int | None = Field(default=None, ge=0, le=120)
     healthy_volunteers: bool | None = None
-    enrollment_count: int | None = Field(default=None, ge=0)
     source_url: str | None = None
     is_archived: bool | None = None
 
@@ -80,8 +78,6 @@ class TrialInterventionAdd(BaseModel):
     """Request body for linking an intervention to a trial."""
 
     intervention_name: str = Field(min_length=2, max_length=500)
-    intervention_type: str | None = Field(default=None, max_length=150)
-    arm_group_label: str | None = Field(default=None, max_length=255)
 
 
 class TrialCriteriaCreate(BaseModel):

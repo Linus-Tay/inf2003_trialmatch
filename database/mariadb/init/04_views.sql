@@ -20,7 +20,6 @@ SELECT
   t.minimum_age,
   t.maximum_age,
   t.healthy_volunteers,
-  t.enrollment_count,
   COALESCE(cache.condition_count, 0) AS condition_count,
   COALESCE(cache.intervention_count, 0) AS intervention_count,
   COALESCE(cache.criteria_count, 0) AS criteria_count,

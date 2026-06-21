@@ -76,7 +76,6 @@ CREATE TABLE trials (
   minimum_age INT,
   maximum_age INT,
   healthy_volunteers BOOLEAN,
-  enrollment_count INT,
   source_url VARCHAR(1000),
   is_archived BOOLEAN NOT NULL DEFAULT FALSE,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -147,7 +146,6 @@ CREATE TABLE trial_conditions (
 CREATE TABLE interventions (
   intervention_id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   intervention_name VARCHAR(500) NOT NULL,
-  intervention_type VARCHAR(150),
   normalised_name VARCHAR(500) NOT NULL UNIQUE,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -155,7 +153,6 @@ CREATE TABLE interventions (
 CREATE TABLE trial_interventions (
   trial_id BIGINT UNSIGNED NOT NULL,
   intervention_id BIGINT UNSIGNED NOT NULL,
-  arm_group_label VARCHAR(255),
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (trial_id, intervention_id),
   CONSTRAINT fk_trial_interventions_trial FOREIGN KEY (trial_id) REFERENCES trials(trial_id) ON DELETE CASCADE,
@@ -206,7 +203,6 @@ CREATE TABLE patient_profiles (
 CREATE TABLE patient_conditions (
   patient_profile_id BIGINT UNSIGNED NOT NULL,
   condition_id BIGINT UNSIGNED NOT NULL,
-  condition_status VARCHAR(80) DEFAULT 'Current',
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (patient_profile_id, condition_id),
   CONSTRAINT fk_patient_conditions_profile FOREIGN KEY (patient_profile_id) REFERENCES patient_profiles(patient_profile_id) ON DELETE CASCADE,
@@ -250,7 +246,6 @@ CREATE TABLE match_status_history (
 CREATE TABLE saved_trials (
   saved_trial_id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
   user_id BIGINT UNSIGNED NOT NULL,
-  patient_profile_id BIGINT UNSIGNED,
   trial_id BIGINT UNSIGNED NOT NULL,
   saved_status ENUM('Saved', 'Interested', 'Potential Match', 'Needs Review') NOT NULL DEFAULT 'Saved',
   notes TEXT,
@@ -258,7 +253,6 @@ CREATE TABLE saved_trials (
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uq_saved_trial_user_trial (user_id, trial_id),
   CONSTRAINT fk_saved_trials_user FOREIGN KEY (user_id) REFERENCES app_users(user_id),
-  CONSTRAINT fk_saved_trials_profile FOREIGN KEY (patient_profile_id) REFERENCES patient_profiles(patient_profile_id) ON DELETE SET NULL,
   CONSTRAINT fk_saved_trials_trial FOREIGN KEY (trial_id) REFERENCES trials(trial_id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

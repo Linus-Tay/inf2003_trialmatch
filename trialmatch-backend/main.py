@@ -1,39 +1,63 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from db import APP_NAME, FRONTEND_ORIGIN
-from routes import router as core_router
-from module_routes import router as module_router
-
-app = FastAPI(title=APP_NAME)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        FRONTEND_ORIGIN,
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+from config import APP_NAME, FRONTEND_ORIGIN
+from routers import (
+    analytics,
+    auth,
+    dashboard,
+    database_demo,
+    health,
+    lookups,
+    management,
+    mongo_documents,
+    patients,
+    quality,
+    saved_trials,
+    trial_enrichment,
+    trials,
 )
 
-# Core routes:
-# login, signup, dashboard, trial search, patient matching,
-# analytics, data quality, and existing database demo routes.
-app.include_router(core_router, prefix="/api")
 
-# Extra module routes:
-# saved trial status updates, criteria CRUD, condition/intervention linking,
-# MongoDB annotations, view demos, trigger tests, transaction demo,
-# and index performance demo.
-app.include_router(module_router, prefix="/api")
+def create_app() -> FastAPI:
+    app = FastAPI(title=APP_NAME)
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[
+            FRONTEND_ORIGIN,
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+        ],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    routers = [
+        health.router,
+        auth.router,
+        dashboard.router,
+        lookups.router,
+        trials.router,
+        saved_trials.router,
+        management.router,
+        trial_enrichment.router,
+        patients.router,
+        analytics.router,
+        quality.router,
+        mongo_documents.router,
+        database_demo.router,
+    ]
+
+    for router in routers:
+        app.include_router(router, prefix="/api")
+
+    @app.get("/")
+    def root():
+        return {"message": "TrialMatch backend is running.", "docs": "/docs"}
+
+    return app
 
 
-@app.get("/")
-def root():
-    return {
-        "message": "TrialMatch backend is running.",
-        "docs": "/docs",
-    }
+app = create_app()

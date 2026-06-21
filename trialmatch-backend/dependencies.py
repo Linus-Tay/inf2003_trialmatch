@@ -7,52 +7,33 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from pymysql.connections import Connection
 
-from db import JWT_ALGORITHM, JWT_EXPIRE_MINUTES, JWT_SECRET_KEY, get_mariadb
+from config import JWT_ALGORITHM, JWT_EXPIRE_MINUTES, JWT_SECRET_KEY
+from database import get_mariadb
 from schemas import SignupRequest
 
 bearer_scheme = HTTPBearer()
 
 
 def hash_password(password: str) -> str:
-    return bcrypt.hashpw(
-        password.encode("utf-8"),
-        bcrypt.gensalt(),
-    ).decode("utf-8")
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
 def verify_password(password: str, password_hash: str | None) -> bool:
     if not password_hash:
         return False
 
-    return bcrypt.checkpw(
-        password.encode("utf-8"),
-        password_hash.encode("utf-8"),
-    )
+    return bcrypt.checkpw(password.encode("utf-8"), password_hash.encode("utf-8"))
 
 
 def create_access_token(data: dict[str, Any]) -> str:
-    expires_at = datetime.now(timezone.utc) + timedelta(
-        minutes=JWT_EXPIRE_MINUTES
-    )
-
-    payload = {
-        **data,
-        "exp": expires_at,
-    }
-
-    return jwt.encode(
-        payload,
-        JWT_SECRET_KEY,
-        algorithm=JWT_ALGORITHM,
-    )
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=JWT_EXPIRE_MINUTES)
+    payload = {**data, "exp": expires_at}
+    return jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
 
 
 def get_patient_role_id(conn: Connection) -> int:
     with conn.cursor() as cursor:
-        cursor.execute(
-            "SELECT role_id FROM user_roles WHERE role_name = %s",
-            ("Patient",),
-        )
+        cursor.execute("SELECT role_id FROM user_roles WHERE role_name = %s", ("Patient",))
         role = cursor.fetchone()
 
     if not role:
@@ -77,10 +58,7 @@ def create_user(conn: Connection, payload: SignupRequest) -> dict[str, Any]:
     email = payload.email.lower().strip()
 
     with conn.cursor() as cursor:
-        cursor.execute(
-            "SELECT user_id FROM app_users WHERE email = %s",
-            (email,),
-        )
+        cursor.execute("SELECT user_id FROM app_users WHERE email = %s", (email,))
         existing_user = cursor.fetchone()
 
         if existing_user:
@@ -96,23 +74,14 @@ def create_user(conn: Connection, payload: SignupRequest) -> dict[str, Any]:
             INSERT INTO app_users (role_id, full_name, email, password_hash)
             VALUES (%s, %s, %s, %s)
             """,
-            (
-                role_id,
-                payload.full_name.strip(),
-                email,
-                hash_password(payload.password),
-            ),
+            (role_id, payload.full_name.strip(), email, hash_password(payload.password)),
         )
 
         user_id = cursor.lastrowid
 
         cursor.execute(
             """
-            SELECT
-                u.user_id,
-                u.full_name,
-                u.email,
-                r.role_name
+            SELECT u.user_id, u.full_name, u.email, r.role_name
             FROM app_users u
             JOIN user_roles r ON u.role_id = r.role_id
             WHERE u.user_id = %s
@@ -129,13 +98,7 @@ def authenticate_user(conn: Connection, email: str, password: str) -> dict[str, 
     with conn.cursor() as cursor:
         cursor.execute(
             """
-            SELECT
-                u.user_id,
-                u.full_name,
-                u.email,
-                u.password_hash,
-                u.is_active,
-                r.role_name
+            SELECT u.user_id, u.full_name, u.email, u.password_hash, u.is_active, r.role_name
             FROM app_users u
             JOIN user_roles r ON u.role_id = r.role_id
             WHERE u.email = %s
@@ -145,16 +108,10 @@ def authenticate_user(conn: Connection, email: str, password: str) -> dict[str, 
         user = cursor.fetchone()
 
     if not user or not verify_password(password, user.get("password_hash")):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password.",
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password.")
 
     if not user["is_active"]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="This account is inactive.",
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This account is inactive.")
 
     return user
 
@@ -166,11 +123,7 @@ def get_current_user(
     token = credentials.credentials
 
     try:
-        payload = jwt.decode(
-            token,
-            JWT_SECRET_KEY,
-            algorithms=[JWT_ALGORITHM],
-        )
+        payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
         user_id = payload.get("sub")
 
         if not user_id:
@@ -181,11 +134,7 @@ def get_current_user(
     with conn.cursor() as cursor:
         cursor.execute(
             """
-            SELECT
-                u.user_id,
-                u.full_name,
-                u.email,
-                r.role_name
+            SELECT u.user_id, u.full_name, u.email, r.role_name
             FROM app_users u
             JOIN user_roles r ON u.role_id = r.role_id
             WHERE u.user_id = %s AND u.is_active = TRUE

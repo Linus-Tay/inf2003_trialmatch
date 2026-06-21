@@ -237,6 +237,27 @@ def split_pipe_values(value):
     ]
 
 
+def extract_simple_keywords(text):
+    important_terms = [
+        "cancer", "diabetes", "hypertension", "pregnant", "pregnancy",
+        "kidney", "liver", "heart", "severe", "history", "allergy",
+        "chemotherapy", "surgery", "adult", "child", "excluded"
+    ]
+
+    lowered = text.lower()
+
+    return [
+        term
+        for term in important_terms
+        if term in lowered
+    ]
+
+
+def contains_manual_review_terms(text):
+    lowered = text.lower()
+    return any(term in lowered for term in ["severe", "history of", "clinically significant", "investigator"])
+
+
 def get_lookup_maps(conn):
     with conn.cursor() as cursor:
         cursor.execute("SELECT phase_id, phase_name FROM trial_phases")
@@ -464,11 +485,11 @@ def import_conditions_and_interventions(conn, nct_to_trial_id, limit=None):
 
                     cursor.execute(
                         """
-                        INSERT INTO interventions (intervention_name, intervention_type, normalised_name)
-                        VALUES (%s, %s, %s)
+                        INSERT INTO interventions (intervention_name, normalised_name)
+                        VALUES (%s, %s)
                         ON DUPLICATE KEY UPDATE intervention_name = VALUES(intervention_name)
                         """,
-                        (intervention, None, normalised),
+                        (intervention, normalised),
                     )
 
                     cursor.execute(
@@ -531,9 +552,9 @@ def import_criteria(conn, nct_to_trial_id, limit=None):
                 criterion_text,
                 int(row.get("criterion_index") or 1),
                 int(row.get("criterion_length") or len(criterion_text)),
-                0,
+                len(extract_simple_keywords(criterion_text)),
                 min(99.99, len(criterion_text) / 20),
-                False,
+                contains_manual_review_terms(criterion_text),
             ))
 
         if not rows:

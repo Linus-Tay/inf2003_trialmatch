@@ -56,14 +56,21 @@ CREATE TRIGGER trg_audit_trial_insert
 AFTER INSERT ON trials
 FOR EACH ROW
 BEGIN
-  INSERT INTO audit_logs (table_name, record_pk, action_type, new_values)
+  INSERT INTO audit_logs (user_id, table_name, record_pk, action_type, new_values)
   VALUES (
+    NULLIF(@app_user_id, 0),
     'trials',
     NEW.trial_id,
     'INSERT',
     JSON_OBJECT(
       'nct_id', NEW.nct_id,
       'brief_title', NEW.brief_title,
+      'phase_id', NEW.phase_id,
+      'status_id', NEW.status_id,
+      'study_type_id', NEW.study_type_id,
+      'sex_id', NEW.sex_id,
+      'minimum_age', NEW.minimum_age,
+      'maximum_age', NEW.maximum_age,
       'healthy_volunteers', NEW.healthy_volunteers,
       'is_archived', NEW.is_archived
     )
@@ -74,8 +81,9 @@ CREATE TRIGGER trg_audit_trial_update
 AFTER UPDATE ON trials
 FOR EACH ROW
 BEGIN
-  INSERT INTO audit_logs (table_name, record_pk, action_type, old_values, new_values)
+  INSERT INTO audit_logs (user_id, table_name, record_pk, action_type, old_values, new_values)
   VALUES (
+    NULLIF(@app_user_id, 0),
     'trials',
     NEW.trial_id,
     CASE

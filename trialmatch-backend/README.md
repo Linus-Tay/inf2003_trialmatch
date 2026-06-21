@@ -1,28 +1,31 @@
 # TrialMatch Backend
 
-FastAPI backend for the TrialMatch database project.
+Clean FastAPI backend for the TrialMatch database project.
 
-The backend reads database settings from the root `.env` and optionally from `trialmatch-backend/.env`.
+## Structure
+
+```txt
+trialmatch-backend/
+├── main.py              # FastAPI entry point and router registration
+├── config.py            # Environment configuration
+├── database.py          # MariaDB and MongoDB connection dependencies
+├── dependencies.py      # Auth/JWT/current-user helpers
+├── routers/             # Route modules grouped by feature
+├── schemas/             # Pydantic request/response models
+├── services/            # Shared cache/helper logic
+├── models/              # Reserved for ORM models if added later
+├── .env.example         # Example local environment variables
+└── requirements.txt
+```
 
 ## Run locally
 
-### macOS / Linux
-
 ```bash
 cd trialmatch-backend
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn main:app --reload
-```
-
-### Windows PowerShell
-
-```powershell
-cd trialmatch-backend
 python -m venv .venv
-.venv\Scripts\Activate.ps1
+source .venv/bin/activate   # Windows: .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+cp .env.example .env        # update values if needed
 uvicorn main:app --reload
 ```
 
@@ -32,3 +35,10 @@ Open:
 http://127.0.0.1:8000/docs
 http://127.0.0.1:8000/api/health/db
 ```
+
+## Notes
+
+- Public API paths are preserved so the existing frontend should continue to work.
+- Duplicate cache-refresh route logic was centralized into `services/cache.py`.
+- Data-quality flag generation is available at `POST /api/quality/generate-flags`.
+- The database demo index route includes full-text search examples to match the full-text indexes in the SQL setup.

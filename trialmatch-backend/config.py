@@ -1,14 +1,13 @@
 import os
 from pathlib import Path
 
-import pymysql
 from dotenv import load_dotenv
-from pymongo import MongoClient
-from pymysql.connections import Connection
 
-BACKEND_DIR = Path(__file__).resolve().parent
+APP_DIR = Path(__file__).resolve().parent
+BACKEND_DIR = APP_DIR.parent
 ROOT_DIR = BACKEND_DIR.parent
 
+# Load the project-level .env first, then allow backend/.env to override it.
 load_dotenv(ROOT_DIR / ".env")
 load_dotenv(BACKEND_DIR / ".env", override=True)
 
@@ -30,43 +29,3 @@ MONGO_DB = os.getenv("MONGO_DB", "trialmatch_nosql")
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "dev-only-change-me")
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 JWT_EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", "1440"))
-
-
-def get_mariadb_connection() -> Connection:
-    return pymysql.connect(
-        host=MARIADB_HOST,
-        port=MARIADB_PORT,
-        user=MARIADB_USER,
-        password=MARIADB_PASSWORD,
-        database=MARIADB_DB,
-        cursorclass=pymysql.cursors.DictCursor,
-        autocommit=False,
-        connect_timeout=5,
-        read_timeout=30,
-        write_timeout=30,
-    )
-
-
-def get_mariadb():
-    conn = get_mariadb_connection()
-
-    try:
-        yield conn
-    finally:
-        conn.close()
-
-
-def get_mongo_client() -> MongoClient:
-    return MongoClient(
-        MONGO_URI,
-        serverSelectionTimeoutMS=5000,
-    )
-
-
-def get_mongodb():
-    client = get_mongo_client()
-
-    try:
-        yield client[MONGO_DB]
-    finally:
-        client.close()
