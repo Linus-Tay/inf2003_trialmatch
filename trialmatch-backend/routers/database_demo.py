@@ -348,91 +348,281 @@ def transaction_demo_create_trial(
 ):
     """Demonstrate a multi-table transaction without keeping test rows.
 
-    The temporary trial, condition link, and criterion are inserted only inside
-    the current transaction. The route then rolls back deliberately so the
-    database remains dataset-backed and free from artificial records.
+    Inserts a temporary trial, condition link, and eligibility criterion,
+    previews the joined result, then rolls everything back.
     """
 
-    nct_id = "ROLLBACK_CHECK_TRIAL"
+    nct_id = f"NCT{int(time.time()) % 100000000:08d}"
+
+    def get_columns(cursor, table_name):
+        cursor.execute(f"SHOW COLUMNS FROM `{table_name}`")
+        return {row["Field"] for row in cursor.fetchall()}
+
+    def insert_dynamic(cursor, table_name, payload):
+        columns = list(payload.keys())
+        placeholders = ", ".join(["%s"] * len(columns))
+        column_sql = ", ".join([f"`{column}`" for column in columns])
+
+        cursor.execute(
+            f"""
+            INSERT INTO `{table_name}` ({column_sql})
+            VALUES ({placeholders})
+            """,
+            tuple(payload.values()),
+        )
+
+        return cursor.lastrowid
 
     try:
         with conn.cursor() as cursor:
+            trial_columns = get_columns(cursor, "trials")
+            criteria_columns = get_columns(cursor, "eligibility_criteria")
+            condition_columns = get_columns(cursor, "conditions")
+
             phase_id = get_first_lookup_id(cursor, "trial_phases", "phase_id")
             status_id = get_first_lookup_id(cursor, "trial_statuses", "status_id")
             study_type_id = get_first_lookup_id(cursor, "study_types", "study_type_id")
             sex_id = get_first_lookup_id(cursor, "sex_eligibilities", "sex_id")
 
-            cursor.execute(
-                """
-                INSERT INTO trials (
-                    nct_id,
-                    brief_title,
-                    phase_id,
-                    status_id,
-                    study_type_id,
-                    sex_id,
-                    minimum_age,
-                    maximum_age,
-                    healthy_volunteers,
-                )
-                VALUES (%s, %s, %s, %s, %s, %s, 18, 65, TRUE, 100)
-                """,
-                (nct_id, "Rollback Transaction Check Trial", phase_id, status_id, study_type_id, sex_id),
+            min_age_column = (
+                "minimum_age"
+                if "minimum_age" in trial_columns
+                else "min_age_years"
+                if "min_age_years" in trial_columns
+                else None
             )
-            trial_id = cursor.lastrowid
+
+            max_age_column = (
+                "maximum_age"
+                if "maximum_age" in trial_columns
+                else "max_age_years"
+                if "max_age_years" in trial_columns
+                else None
+            )
+
+            trial_payload = {
+                "nct_id": nct_id,
+                "brief_title": "Rollback Transaction Check Trial",
+                "phase_id": phase_id,
+                "status_id": status_id,
+                "study_type_id": study_type_id,
+                "sex_id": sex_id,
+                "healthy_volunteers": True,
+            }
+
+            if min_age_column:
+                trial_payload[min_age_column] = 18
+
+            if max_age_column:
+                trial_payload[max_age_column] = 65
+
+            if "enrollment" in trial_columns:
+                trial_payload["enrollment"] = 100
+
+            if "is_archived" in trial_columns:
+                trial_payload["is_archived"] = False
+
+            trial_id = insert_dynamic(cursor, "trials", trial_payload)
 
             condition_name = "Rollback Transaction Check Condition"
             condition_normalised = normalise_name(condition_name)
 
+            normalised_column = None
+
+            if "normalised_name" in condition_columns:
+                normalised_column = "normalised_name"
+            elif "normalized_name" in condition_columns:
+                normalised_column = "normalized_name"
+
+            if normalised_column:
+                cursor.execute(
+                    f"""
+                    INSERT INTO conditions (
+                        condition_name,
+                        `{normalised_column}`
+                    )
+                    VALUES (%s, %s)
+                    ON DUPLICATE KEY UPDATE
+                        condition_name = VALUES(condition_name)
+                    """,
+                    (condition_name, condition_normalised),
+                )
+
+                cursor.execute(
+                    f"""
+                    SELECT condition_id
+                    FROM conditions
+                    WHERE `{normalised_column}` = %s
+                    LIMIT 1
+                    """,
+                    (condition_normalised,),
+                )
+            else:
+                cursor.execute(
+                    """
+                    INSERT INTO conditions (condition_name)
+                    VALUES (%s)
+                    ON DUPLICATE KEY UPDATE
+                        condition_name = VALUES(condition_name)
+                    """,
+                    (condition_name,),
+                )
+
+                cursor.execute(
+                    """
+                    SELECT condition_id
+                    FROM conditions
+                    WHERE condition_name = %s
+                    LIMIT 1
+                    """,
+                    (condition_name,),
+                )
+
+            condition = cursor.fetchone()
+
+            if not condition:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Temporary condition could not be found after insert.",
+                )
+
+            condition_id = condition["condition_id"]
+
             cursor.execute(
                 """
-                INSERT INTO conditions (condition_name, normalised_name)
+                INSERT INTO trial_conditions (
+                    trial_id,
+                    condition_id
+                )
                 VALUES (%s, %s)
-                ON DUPLICATE KEY UPDATE condition_name = VALUES(condition_name)
                 """,
-                (condition_name, condition_normalised),
+                (trial_id, condition_id),
             )
-
-            cursor.execute("SELECT condition_id FROM conditions WHERE normalised_name = %s", (condition_normalised,))
-            condition_id = cursor.fetchone()["condition_id"]
-
-            cursor.execute("INSERT INTO trial_conditions (trial_id, condition_id) VALUES (%s, %s)", (trial_id, condition_id))
 
             criteria_text = "Participant must be eligible for the rollback transaction check."
 
-            cursor.execute(
-                """
-                INSERT INTO eligibility_criteria (
-                    trial_id,
-                    criteria_type,
-                    criteria_text,
-                    criteria_order,
-                    text_length,
-                    keyword_count,
-                    complexity_score,
-                    requires_manual_review
-                )
-                VALUES (%s, 'Inclusion', %s, 1, %s, 2, 20, FALSE)
-                """,
-                (trial_id, criteria_text, len(criteria_text)),
+            type_column = (
+                "criteria_type"
+                if "criteria_type" in criteria_columns
+                else "criterion_type"
+                if "criterion_type" in criteria_columns
+                else None
             )
 
-            refresh_trial_cache_for_trial(cursor, trial_id)
-            refresh_condition_summary_for_condition(cursor, condition_id)
+            text_column = (
+                "criteria_text"
+                if "criteria_text" in criteria_columns
+                else "text"
+                if "text" in criteria_columns
+                else None
+            )
+
+            order_column = (
+                "criteria_order"
+                if "criteria_order" in criteria_columns
+                else "order_index"
+                if "order_index" in criteria_columns
+                else None
+            )
+
+            if not type_column or not text_column:
+                raise HTTPException(
+                    status_code=500,
+                    detail="eligibility_criteria table is missing criteria type/text columns.",
+                )
+
+            criteria_payload = {
+                "trial_id": trial_id,
+                type_column: "Inclusion",
+                text_column: criteria_text,
+            }
+
+            if order_column:
+                criteria_payload[order_column] = 1
+
+            if "text_length" in criteria_columns:
+                criteria_payload["text_length"] = len(criteria_text)
+
+            if "keyword_count" in criteria_columns:
+                criteria_payload["keyword_count"] = 2
+
+            if "complexity_score" in criteria_columns:
+                criteria_payload["complexity_score"] = 20
+
+            if "requires_manual_review" in criteria_columns:
+                criteria_payload["requires_manual_review"] = False
+
+            if "manual_flag" in criteria_columns:
+                criteria_payload["manual_flag"] = False
+
+            if "is_key" in criteria_columns:
+                criteria_payload["is_key"] = True
+
+            insert_dynamic(cursor, "eligibility_criteria", criteria_payload)
+
+            cache_warnings = []
+
+            try:
+                refresh_trial_cache_for_trial(cursor, trial_id)
+            except Exception as exc:
+                cache_warnings.append(f"Trial cache refresh skipped: {exc}")
+
+            try:
+                refresh_condition_summary_for_condition(cursor, condition_id)
+            except Exception as exc:
+                cache_warnings.append(f"Condition cache refresh skipped: {exc}")
+
+            cursor.execute(
+                f"""
+                SELECT
+                    t.trial_id,
+                    t.nct_id,
+                    t.brief_title,
+                    c.condition_name,
+                    ec.`{text_column}` AS criteria_text
+                FROM trials t
+                JOIN trial_conditions tc ON t.trial_id = tc.trial_id
+                JOIN conditions c ON tc.condition_id = c.condition_id
+                JOIN eligibility_criteria ec ON t.trial_id = ec.trial_id
+                WHERE t.trial_id = %s
+                LIMIT 1
+                """,
+                (trial_id,),
+            )
+
+            inserted_preview = cursor.fetchone()
 
         conn.rollback()
 
         return {
             "transaction_success": True,
             "rolled_back": True,
-            "message": "Transaction check succeeded and was rolled back. No temporary rows were kept.",
+            "message": "Transaction demo succeeded and was rolled back. No temporary rows were kept.",
             "temporary_trial_id": trial_id,
             "temporary_nct_id": nct_id,
+            "inserted_preview": inserted_preview,
+            "steps_completed": [
+                "Inserted temporary trial",
+                "Inserted or reused condition",
+                "Linked trial to condition",
+                "Inserted eligibility criterion",
+                "Previewed joined transaction result",
+                "Rolled back transaction",
+            ],
+            "cache_warnings": cache_warnings,
         }
+
+    except HTTPException:
+        conn.rollback()
+        raise
+
     except Exception as exc:
         conn.rollback()
-        raise HTTPException(status_code=500, detail=f"Transaction check rolled back: {exc}")
-
+        raise HTTPException(
+            status_code=500,
+            detail=f"Transaction demo failed and was rolled back: {exc}",
+        )
+    
 @router.get("/database-demo/index-performance")
 def index_performance_demo(
     conn: Connection = Depends(get_mariadb),
