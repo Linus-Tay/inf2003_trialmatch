@@ -267,12 +267,22 @@ def get_trial_detail(
             SELECT criteria_id, criteria_type, criteria_text, criteria_order, complexity_score, requires_manual_review
             FROM eligibility_criteria
             WHERE trial_id = %s
-            ORDER BY criteria_type, criteria_order
-            LIMIT 80
+            ORDER BY criteria_order, criteria_id
+            LIMIT 120
             """,
             (trial_id,),
         )
-        criteria = cursor.fetchall()
+        criteria = decorate_criteria_for_display(cursor.fetchall())
+
+        trial["display_inclusion_count"] = sum(
+            1 for item in criteria
+            if item.get("display_type") == "Inclusion" and not item.get("is_section_heading")
+        )
+
+        trial["display_exclusion_count"] = sum(
+            1 for item in criteria
+            if item.get("display_type") == "Exclusion" and not item.get("is_section_heading")
+        )
 
         cursor.execute(
             """
@@ -347,3 +357,90 @@ def unsave_trial(
 
     conn.commit()
     return {"message": "Trial removed from saved list."}
+
+def decorate_criteria_for_display(criteria: list[dict]) -> list[dict]:
+    current_display_type = None
+    cleaned = []
+
+    for item in criteria:
+        text = (item.get("criteria_text") or "").strip()
+        raw_type = normalise_raw_criteria_type(item.get("criteria_type"))
+        detected_type = detect_criteria_type_from_text(text)
+
+        if detected_type:
+            current_display_type = detected_type
+
+        item["display_type"] = detected_type or current_display_type or raw_type
+        item["is_section_heading"] = is_criteria_section_heading(text)
+
+        cleaned.append(item)
+
+    return cleaned
+
+
+def normalise_raw_criteria_type(value) -> str:
+    text = str(value or "").strip().lower()
+
+    if "inclusion" in text:
+        return "Inclusion"
+
+    if "exclusion" in text:
+        return "Exclusion"
+
+    return "General"
+
+
+def detect_criteria_type_from_text(text: str) -> str | None:
+    lowered = text.lower().strip()
+
+    inclusion_patterns = [
+        "inclusion criteria",
+        "following inclusion criteria",
+        "meet the following inclusion",
+        "meet any of the following inclusion",
+        "eligible for enrollment",
+        "eligible for enrolment",
+    ]
+
+    exclusion_patterns = [
+        "exclusion criteria",
+        "following exclusion criteria",
+        "not eligible",
+        "will be excluded",
+        "are excluded",
+    ]
+
+    if any(pattern in lowered for pattern in inclusion_patterns):
+        return "Inclusion"
+
+    if any(pattern in lowered for pattern in exclusion_patterns):
+        return "Exclusion"
+
+    return None
+
+
+def is_criteria_section_heading(text: str) -> bool:
+    cleaned = text.strip()
+    lowered = cleaned.lower()
+
+    if not cleaned:
+        return False
+
+    heading_phrases = [
+        "inclusion criteria",
+        "exclusion criteria",
+        "participant selection",
+        "cohort participant selection",
+        "arm/module participant selection",
+    ]
+
+    if any(phrase in lowered for phrase in heading_phrases) and len(cleaned) <= 180:
+        return True
+
+    heading_endings = [
+        "cohort",
+        "arm",
+        "module",
+    ]
+
+    return len(cleaned) <= 80 and any(lowered.endswith(ending) for ending in heading_endings)
