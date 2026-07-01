@@ -3,11 +3,10 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-APP_DIR = Path(__file__).resolve().parent
-BACKEND_DIR = APP_DIR.parent
+BACKEND_DIR = Path(__file__).resolve().parent
 ROOT_DIR = BACKEND_DIR.parent
 
-# Load the project-level .env first, then allow backend/.env to override it.
+# Load the project-level .env first, then allow trialmatch-backend/.env to override it.
 load_dotenv(ROOT_DIR / ".env")
 load_dotenv(BACKEND_DIR / ".env", override=True)
 

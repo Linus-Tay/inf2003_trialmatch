@@ -2,12 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pymysql.connections import Connection
 
 from database import get_mariadb
-from dependencies import get_current_user
+from dependencies import get_current_user, require_admin
 from schemas import TrialCreate, TrialUpdate
 from services.helpers import ensure_limit
 from services.audit import set_audit_user
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_admin)])
 
 # ============================================================
 # MANAGEMENT

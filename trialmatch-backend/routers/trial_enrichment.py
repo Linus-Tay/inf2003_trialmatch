@@ -5,7 +5,7 @@ from pymysql.connections import Connection
 
 from database import get_mariadb
 from dependencies import get_current_user
-from schemas import TrialConditionAdd, TrialCriteriaCreate, TrialCriteriaUpdate, TrialInterventionAdd
+from schemas import TrialConditionAdd, TrialConditionUpdate, TrialCriteriaCreate, TrialCriteriaUpdate, TrialInterventionAdd, TrialInterventionUpdate
 from services.cache import refresh_condition_summary_for_condition, refresh_trial_cache_for_trial
 from services.helpers import normalise_name, simple_keyword_count
 
@@ -103,6 +103,121 @@ def add_trial_intervention(
     conn.commit()
     return {"message": "Intervention linked.", "intervention_id": intervention_id}
 
+@router.patch("/trials/{trial_id}/interventions/{intervention_id}")
+def update_trial_intervention(
+    trial_id: int,
+    intervention_id: int,
+    payload: TrialInterventionUpdate,
+    conn: Connection = Depends(get_mariadb),
+    current_user: dict = Depends(get_current_user),
+):
+    """Update an intervention link for one selected trial only."""
+
+    new_name = payload.intervention_name.strip() if payload.intervention_name else None
+
+    if not new_name:
+        return {"message": "Nothing to update."}
+
+    with conn.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT trial_id
+            FROM trial_interventions
+            WHERE trial_id = %s AND intervention_id = %s
+            """,
+            (trial_id, intervention_id),
+        )
+        existing_link = cursor.fetchone()
+
+        if not existing_link:
+            raise HTTPException(
+                status_code=404,
+                detail="Trial intervention link not found.",
+            )
+
+        normalised = normalise_name(new_name)
+
+        cursor.execute(
+            """
+            INSERT INTO interventions (intervention_name, normalised_name)
+            VALUES (%s, %s)
+            ON DUPLICATE KEY UPDATE intervention_name = VALUES(intervention_name)
+            """,
+            (new_name, normalised),
+        )
+
+        cursor.execute(
+            "SELECT intervention_id FROM interventions WHERE normalised_name = %s",
+            (normalised,),
+        )
+        final_intervention_id = cursor.fetchone()["intervention_id"]
+
+        if final_intervention_id != intervention_id:
+            cursor.execute(
+                """
+                INSERT IGNORE INTO trial_interventions (trial_id, intervention_id)
+                VALUES (%s, %s)
+                """,
+                (trial_id, final_intervention_id),
+            )
+
+            cursor.execute(
+                """
+                DELETE FROM trial_interventions
+                WHERE trial_id = %s AND intervention_id = %s
+                """,
+                (trial_id, intervention_id),
+            )
+
+        refresh_trial_cache_for_trial(cursor, trial_id)
+
+    conn.commit()
+
+    return {
+        "message": "Intervention updated.",
+        "intervention_id": final_intervention_id,
+    }
+
+
+@router.delete("/trials/{trial_id}/interventions/{intervention_id}")
+def delete_trial_intervention(
+    trial_id: int,
+    intervention_id: int,
+    conn: Connection = Depends(get_mariadb),
+    current_user: dict = Depends(get_current_user),
+):
+    """Remove one intervention link from one selected trial."""
+
+    with conn.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT trial_id
+            FROM trial_interventions
+            WHERE trial_id = %s AND intervention_id = %s
+            """,
+            (trial_id, intervention_id),
+        )
+        existing_link = cursor.fetchone()
+
+        if not existing_link:
+            raise HTTPException(
+                status_code=404,
+                detail="Trial intervention link not found.",
+            )
+
+        cursor.execute(
+            """
+            DELETE FROM trial_interventions
+            WHERE trial_id = %s AND intervention_id = %s
+            """,
+            (trial_id, intervention_id),
+        )
+
+        refresh_trial_cache_for_trial(cursor, trial_id)
+
+    conn.commit()
+
+    return {"message": "Intervention removed."}
 
 @router.post("/trials/{trial_id}/criteria")
 def add_trial_criteria(
@@ -173,8 +288,15 @@ def update_trial_criteria(
     update_data = payload.model_dump(exclude_unset=True)
 
     if "criteria_text" in update_data and update_data["criteria_text"] is not None:
-        text_length = len(update_data["criteria_text"])
+        criteria_text = update_data["criteria_text"]
+        text_length = len(criteria_text)
         update_data["text_length"] = text_length
+
+        ### Keep derived criteria fields consistent when the text is edited.
+        ### The frontend does not ask users to maintain keyword counts manually.
+        if "keyword_count" not in update_data or update_data["keyword_count"] is None:
+            update_data["keyword_count"] = simple_keyword_count(criteria_text)
+
         if "complexity_score" not in update_data or update_data["complexity_score"] is None:
             update_data["complexity_score"] = min(99.99, round(text_length / 20, 2))
 
@@ -230,3 +352,130 @@ def delete_trial_criteria(
 
     conn.commit()
     return {"message": "Criteria deleted."}
+
+@router.patch("/trials/{trial_id}/conditions/{condition_id}")
+def update_trial_condition(
+    trial_id: int,
+    condition_id: int,
+    payload: TrialConditionUpdate,
+    conn: Connection = Depends(get_mariadb),
+    current_user: dict = Depends(get_current_user),
+):
+    """Update a condition link for one selected trial only."""
+
+    new_name = payload.condition_name.strip() if payload.condition_name else None
+
+    with conn.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT condition_role
+            FROM trial_conditions
+            WHERE trial_id = %s AND condition_id = %s
+            """,
+            (trial_id, condition_id),
+        )
+        existing_link = cursor.fetchone()
+
+        if not existing_link:
+            raise HTTPException(status_code=404, detail="Trial condition link not found.")
+
+        role = payload.condition_role or existing_link["condition_role"] or "Primary"
+        final_condition_id = condition_id
+
+        if new_name:
+            normalised = normalise_name(new_name)
+
+            cursor.execute(
+                """
+                INSERT INTO conditions (condition_name, normalised_name)
+                VALUES (%s, %s)
+                ON DUPLICATE KEY UPDATE condition_name = VALUES(condition_name)
+                """,
+                (new_name, normalised),
+            )
+
+            cursor.execute(
+                "SELECT condition_id FROM conditions WHERE normalised_name = %s",
+                (normalised,),
+            )
+            final_condition_id = cursor.fetchone()["condition_id"]
+
+        if final_condition_id != condition_id:
+            cursor.execute(
+                """
+                INSERT INTO trial_conditions (trial_id, condition_id, condition_role)
+                VALUES (%s, %s, %s)
+                ON DUPLICATE KEY UPDATE condition_role = VALUES(condition_role)
+                """,
+                (trial_id, final_condition_id, role),
+            )
+
+            cursor.execute(
+                """
+                DELETE FROM trial_conditions
+                WHERE trial_id = %s AND condition_id = %s
+                """,
+                (trial_id, condition_id),
+            )
+
+            refresh_condition_summary_for_condition(cursor, condition_id)
+            refresh_condition_summary_for_condition(cursor, final_condition_id)
+        else:
+            cursor.execute(
+                """
+                UPDATE trial_conditions
+                SET condition_role = %s
+                WHERE trial_id = %s AND condition_id = %s
+                """,
+                (role, trial_id, condition_id),
+            )
+
+            refresh_condition_summary_for_condition(cursor, condition_id)
+
+        refresh_trial_cache_for_trial(cursor, trial_id)
+
+    conn.commit()
+
+    return {
+        "message": "Condition updated.",
+        "condition_id": final_condition_id,
+    }
+
+
+@router.delete("/trials/{trial_id}/conditions/{condition_id}")
+def delete_trial_condition(
+    trial_id: int,
+    condition_id: int,
+    conn: Connection = Depends(get_mariadb),
+    current_user: dict = Depends(get_current_user),
+):
+    """Remove one condition link from one selected trial."""
+
+    with conn.cursor() as cursor:
+        cursor.execute(
+            """
+            SELECT trial_id
+            FROM trial_conditions
+            WHERE trial_id = %s AND condition_id = %s
+            """,
+            (trial_id, condition_id),
+        )
+        existing_link = cursor.fetchone()
+
+        if not existing_link:
+            raise HTTPException(status_code=404, detail="Trial condition link not found.")
+
+        cursor.execute(
+            """
+            DELETE FROM trial_conditions
+            WHERE trial_id = %s AND condition_id = %s
+            """,
+            (trial_id, condition_id),
+        )
+
+        refresh_trial_cache_for_trial(cursor, trial_id)
+        refresh_condition_summary_for_condition(cursor, condition_id)
+
+    conn.commit()
+
+    return {"message": "Condition removed."}

@@ -129,7 +129,7 @@ export async function deleteTrialCriteria(criteriaId) {
 }
 
 /* =========================
-   Analytics / quality
+   Analytics
 ========================= */
 
 export async function fetchClinicalAnalytics() {
@@ -142,108 +142,44 @@ export async function fetchCriteriaAnalytics() {
   return response.data;
 }
 
-export async function fetchQualityOverview() {
-  const response = await api.get("/quality/overview");
-  return response.data;
-}
-
-export async function fetchQualityFlags() {
-  const response = await api.get("/quality/flags");
-  return response.data.flags;
-}
-
-export async function resolveQualityFlag(flagId, isResolved = true) {
-  const response = await api.patch(`/quality/flags/${flagId}/resolve`, {
-    is_resolved: isResolved,
-  });
-  return response.data;
-}
-
-export async function fetchQualityOptionalViews() {
-  const response = await api.get("/quality/optional-views");
-  return response.data;
-}
-
-/*
-  Used by DatabaseDemoPage.
-  This avoids needing a new backend route.
-  It reuses your existing /quality/overview and /quality/flags endpoints.
-*/
-export async function fetchCriteriaQualityReport() {
-  const [overviewResponse, flagsResponse] = await Promise.all([
-    api.get("/quality/overview"),
-    api.get("/quality/flags"),
-  ]);
-
-  const overview = overviewResponse.data || {};
-  const flags = flagsResponse.data?.flags || [];
-
-  const headingRows = flags.filter((flag) => {
-    const text = String(
-      flag.criteria_text || flag.text || flag.description || ""
-    ).toLowerCase();
-
-    return (
-      text.trim() === "inclusion criteria:" ||
-      text.trim() === "inclusion criteria" ||
-      text.trim() === "exclusion criteria:" ||
-      text.trim() === "exclusion criteria" ||
-      text.trim() === "eligibility criteria:" ||
-      text.trim() === "eligibility criteria"
-    );
-  });
-
-  const shortFragments = flags.filter((flag) => {
-    const text = String(
-      flag.criteria_text || flag.text || flag.description || ""
-    ).trim();
-
-    return text.length > 0 && text.length < 20;
-  });
-
-  const typeMismatches = flags.filter((flag) => {
-    const type = String(flag.criteria_type || flag.type || "").toLowerCase();
-    const text = String(
-      flag.criteria_text || flag.text || flag.description || ""
-    ).toLowerCase();
-
-    return (
-      (type.includes("exclusion") && text.includes("inclusion criteria")) ||
-      (type.includes("inclusion") && text.includes("exclusion criteria"))
-    );
-  });
-
-  return {
-    ...overview,
-    checked_trials: overview.checked_trials ?? overview.total_trials ?? "—",
-    heading_rows_count:
-      overview.heading_rows_count ?? overview.heading_rows ?? headingRows.length,
-    short_fragment_count:
-      overview.short_fragment_count ??
-      overview.short_fragments ??
-      shortFragments.length,
-    type_mismatch_count:
-      overview.type_mismatch_count ??
-      overview.type_mismatches ??
-      typeMismatches.length,
-    heading_rows: headingRows,
-    short_fragments: shortFragments,
-    type_mismatches: typeMismatches,
-  };
-}
-
 /* =========================
-   MongoDB annotations
+   MongoDB source document review
 ========================= */
 
-export async function createCriteriaAnnotation(payload) {
-  const response = await api.post("/mongo/criteria-annotations", payload);
+export async function getMongoTrialDocumentReview(trialId) {
+  const response = await api.get(`/mongo/trials/${trialId}/document-review`);
   return response.data;
 }
 
-export async function getCriteriaAnnotations(criteriaId) {
-  const response = await api.get(`/mongo/criteria-annotations/${criteriaId}`);
-  return response.data.annotation_document;
+export async function updateParsedCriteriaDocumentReview(trialId, payload) {
+  const response = await api.patch(
+    `/mongo/trials/${trialId}/parsed-document-review`,
+    payload
+  );
+  return response.data;
+}
+
+export async function createParsedCriteriaItem(trialId, payload) {
+  const response = await api.post(
+    `/mongo/trials/${trialId}/parsed-criteria-items`,
+    payload
+  );
+  return response.data;
+}
+
+export async function updateParsedCriteriaItem(trialId, criteriaExternalId, payload) {
+  const response = await api.patch(
+    `/mongo/trials/${trialId}/parsed-criteria-items/${encodeURIComponent(criteriaExternalId)}`,
+    payload
+  );
+  return response.data;
+}
+
+export async function deleteParsedCriteriaItem(trialId, criteriaExternalId) {
+  const response = await api.delete(
+    `/mongo/trials/${trialId}/parsed-criteria-items/${encodeURIComponent(criteriaExternalId)}`
+  );
+  return response.data;
 }
 
 /* =========================
@@ -348,7 +284,32 @@ export async function fetchMongoSamples() {
   return response.data;
 }
 
-export async function refreshPerformanceCache() {
-  const response = await api.post("/database-demo/refresh-cache");
+export async function updateTrialCondition(trialId, conditionId, payload) {
+  const response = await api.patch(
+    `/trials/${trialId}/conditions/${conditionId}`,
+    payload
+  );
+  return response.data;
+}
+
+export async function deleteTrialCondition(trialId, conditionId) {
+  const response = await api.delete(
+    `/trials/${trialId}/conditions/${conditionId}`
+  );
+  return response.data;
+}
+
+export async function updateTrialIntervention(trialId, interventionId, payload) {
+  const response = await api.patch(
+    `/trials/${trialId}/interventions/${interventionId}`,
+    payload
+  );
+  return response.data;
+}
+
+export async function deleteTrialIntervention(trialId, interventionId) {
+  const response = await api.delete(
+    `/trials/${trialId}/interventions/${interventionId}`
+  );
   return response.data;
 }

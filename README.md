@@ -3,12 +3,12 @@
 TrialMatch is a database-driven clinical trial matching project for INF2003. It uses a hybrid database design with:
 
 - **MariaDB** for structured relational data, filtering, joins, matching, views, triggers, indexing, and cache tables.
-- **MongoDB** for raw trial documents, parsed eligibility criteria documents, criteria annotations, and flexible match explanations.
+- **MongoDB** for raw trial source documents and nested parsed eligibility criteria documents used for source traceability and document-style CRUD.
 - **FastAPI** for the backend API.
 - **React + Vite + Tailwind CSS** for the frontend.
 - **Python ETL scripts** to import the clinical trial datasets into MariaDB and MongoDB.
 
-This is the current base version of the project. The database schema and core backend/frontend connection are set up. The UI may still be refined later.
+This version is intended as the final runnable project codebase for local demonstration and marking.
 
 ---
 
@@ -241,6 +241,57 @@ http://localhost:5173
 
 ---
 
+## Demo Access
+
+New signups are created as Patient users by default. Admin-only pages are protected to demonstrate role-based access control.
+
+To promote a registered demo account to Admin, run this in MariaDB/Adminer:
+
+```sql
+UPDATE app_users
+SET role_id = (
+  SELECT role_id
+  FROM user_roles
+  WHERE LOWER(role_name) = 'admin'
+)
+WHERE email = 'test@test.com';
+```
+
+Log out and log back in after promotion so the frontend receives the updated role.
+
+---
+
+## Recommended Demo Flow
+
+1. Register or log in.
+2. Promote the demo account to Admin if needed.
+3. Open Trial Search and Trial Detail.
+4. Create or select a patient profile in Patient Matching.
+5. Generate matches and save/unsave a trial.
+6. Open Saved Trials and update saved-trial notes/status.
+7. Open Trial Management and demonstrate relational CRUD:
+   - create/update/archive trial
+   - add/update/delete condition
+   - add/update/delete intervention
+   - add/update/delete criteria
+   - toggle the criteria manual-review checkbox
+8. Open Database Evidence and demonstrate:
+   - schema/table overview
+   - SQL views
+   - nested queries
+   - triggers
+   - transaction demo
+   - index performance
+   - MongoDB source document review CRUD
+
+MongoDB CRUD is demonstrated in `Database Evidence -> MongoDB`:
+- Create: add a nested parsed criteria item.
+- Read: load raw source and parsed criteria documents.
+- Update: edit document review metadata or a parsed criteria item.
+- Delete: delete a parsed criteria item.
+
+---
+
 ## Useful Commands
 
 ### Stop Docker containers
@@ -284,18 +335,3 @@ For setup issues, check:
 6. Frontend npm packages are installed.
 7. Docker volume was reset if database init files changed.
 ```
-
----
-
-## Current Project Status
-
-The current version includes:
-
-- MariaDB schema, lookup tables, indexes, views, triggers, and cache tables.
-- MongoDB collections and indexes.
-- Python ETL import scripts.
-- FastAPI backend routes for authentication, trial search, patient profiles, matching, saved trials, analytics, quality checks, and database demos.
-- React + Vite + Tailwind frontend base.
-- No fake trial, patient, match, or MongoDB sample data is inserted during database initialization.
-
-Actual clinical trial data is imported through the ETL scripts.

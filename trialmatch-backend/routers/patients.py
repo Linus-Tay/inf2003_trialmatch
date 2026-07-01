@@ -212,12 +212,6 @@ def generate_matches(
                     "match_status": status,
                     "structured_match_passed": structured_passed,
                     "criteria_review_required": review_required,
-                    "explanation": {
-                        "summary": f"{profile['profile_name']} received a {score}% pre-screening score for this trial.",
-                        "age_passed": bool(candidate["age_passed"]),
-                        "sex_passed": bool(candidate["sex_passed"]),
-                        "matched_condition_count": int(candidate["matched_condition_count"]),
-                    },
                 }
             )
 

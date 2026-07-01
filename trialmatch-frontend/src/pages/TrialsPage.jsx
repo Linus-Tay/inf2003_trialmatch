@@ -176,11 +176,11 @@ export default function TrialsPage() {
     <div className="space-y-6">
       <PageHeader
         icon={Search}
-        eyebrow="Trial Search and Discovery"
-        title="Search and filter clinical trials."
-        description="Uses joins, views, indexes and eligibility criteria search to make the relational schema visible through the UI."
+        eyebrow="Trial Search"
+        title="Search clinical trials"
+        description="Find trials by condition, eligibility, phase, status and study details."
       />
-
+      
       <section className="glass-card rounded-[2rem] p-4 sm:p-6">
         <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="inline-flex w-fit items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-600">

@@ -125,23 +125,39 @@ class FlagResolveRequest(BaseModel):
     is_resolved: bool = True
 
 
-class CriteriaAnnotationCreate(BaseModel):
-    """Request body for storing flexible criteria annotations in MongoDB."""
+class ParsedCriteriaItemCreate(BaseModel):
+    """Request body for adding one nested criteria item to a MongoDB document."""
 
-    criteria_id: int
-    trial_id: int
-    note: str = Field(min_length=2)
-    tags: list[str] = Field(default_factory=list)
-    reviewer: str | None = None
+    criteria_type: str = Field(default="General", max_length=50)
+    original_text: str = Field(min_length=2)
+    keywords: list[str] = Field(default_factory=list)
+    requires_manual_review: bool = False
 
 
-class MatchExplanationCreate(BaseModel):
-    """Request body for saving a detailed match explanation document in MongoDB."""
+class ParsedCriteriaItemUpdate(BaseModel):
+    """Request body for editing one nested criteria item in MongoDB."""
 
-    match_id: int
-    patient_profile_id: int
-    trial_id: int
-    nct_id: str | None = None
-    overall_summary: str
-    structured_checks: dict = Field(default_factory=dict)
-    criteria_reasons: list[dict] = Field(default_factory=list)
+    criteria_type: str | None = Field(default=None, max_length=50)
+    original_text: str | None = Field(default=None, min_length=2)
+    keywords: list[str] | None = None
+    requires_manual_review: bool | None = None
+
+
+class ParsedCriteriaDocumentReviewUpdate(BaseModel):
+    """Request body for updating review metadata on a parsed criteria document."""
+
+    status: str = Field(default="Needs Review", max_length=80)
+    reviewer_note: str | None = None
+
+
+class TrialConditionUpdate(BaseModel):
+    """Request body for editing a trial-condition link."""
+
+    condition_name: str | None = Field(default=None, min_length=2, max_length=255)
+    condition_role: str | None = Field(default=None, max_length=50)
+
+
+class TrialInterventionUpdate(BaseModel):
+    """Request body for editing a trial-intervention link."""
+
+    intervention_name: str | None = Field(default=None, min_length=2, max_length=500)

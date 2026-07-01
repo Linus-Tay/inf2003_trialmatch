@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends
 from pymysql.connections import Connection
 
 from database import get_mariadb
-from dependencies import get_current_user
+from dependencies import get_current_user, require_admin
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_admin)])
 
 # ============================================================
 # ANALYTICS

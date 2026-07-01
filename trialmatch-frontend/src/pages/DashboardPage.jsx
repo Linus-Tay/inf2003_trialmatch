@@ -81,9 +81,9 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <PageHeader
         icon={Sparkles}
-        eyebrow="Clinical trial discovery, pre-screening and explainability"
-        title="Find meaningful trial pathways from structured data and eligibility criteria."
-        description="TrialMatch combines normalized MariaDB records with MongoDB criteria documents to support trial search, patient matching, analytics and database demonstration."
+        eyebrow="TrialMatch"
+        title="Find suitable clinical trial pathways"
+        description="Search trials, compare eligibility and manage patient matching in one place."
       />
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -235,7 +235,7 @@ export default function DashboardPage() {
           <UserRoundSearch className="text-blue-700" />
           <h3 className="mt-4 font-bold text-slate-950">Run Patient Match</h3>
           <p className="mt-2 text-sm text-slate-500">
-            Create demo patient profiles and generate match explanations.
+            Create patient profiles and generate structured trial match results.
           </p>
         </Link>
 

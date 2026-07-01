@@ -14,9 +14,9 @@ export default function AnalyticsPage() {
     <div className="space-y-6">
       <PageHeader
         icon={BarChart3}
-        eyebrow="Clinical Trial Analytics Dashboard"
-        title="Visualise recruitment status, phase, study type, age and sex eligibility."
-description="This page turns SQL GROUP BY queries and views into chart-ready API results, including patient/healthy-volunteer eligibility distribution."
+        eyebrow="Analytics"
+        title="Clinical trial insights"
+        description="Review trial status, phase, study type and eligibility trends."
       />
       <ChartPanel title="Trial status" data={data.statuses} />
       <div className="grid gap-6 xl:grid-cols-2">

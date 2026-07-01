@@ -147,3 +147,14 @@ def get_current_user(
         raise HTTPException(status_code=401, detail="User not found.")
 
     return user
+
+def require_admin(current_user: dict = Depends(get_current_user)) -> dict[str, Any]:
+    role_name = str(current_user.get("role_name", "")).lower()
+
+    if role_name != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required.",
+        )
+
+    return current_user

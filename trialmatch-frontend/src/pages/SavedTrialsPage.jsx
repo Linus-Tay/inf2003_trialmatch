@@ -36,10 +36,10 @@ export default function SavedTrialsPage() {
       <PageHeader
         icon={Bookmark}
         eyebrow="Saved Trials"
-        title="Track saved trials, review status and notes."
-        description="This demonstrates user-specific saved trial workflows and status updates."
+        title="Manage saved trials"
+        description="Track shortlisted trials, review status and notes."
       />
-
+      
       {message && <div className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">{message}</div>}
 
       <section className="grid gap-4">

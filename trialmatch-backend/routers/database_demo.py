@@ -5,11 +5,11 @@ from pymongo.database import Database
 from pymysql.connections import Connection
 
 from database import get_mariadb, get_mongodb
-from dependencies import get_current_user
+from dependencies import get_current_user, require_admin
 from services.cache import refresh_all_performance_caches, refresh_condition_summary_for_condition, refresh_trial_cache_for_trial
 from services.helpers import fetch_optional_view, get_first_lookup_id, normalise_name
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_admin)])
 
 # ============================================================
 # DATABASE DEMO
@@ -57,8 +57,6 @@ def database_demo_overview(
     for collection_name in [
         "raw_trial_documents",
         "parsed_criteria_documents",
-        "patient_match_explanations",
-        "criteria_annotations",
     ]:
         mongo_counts.append(
             {
@@ -140,14 +138,20 @@ def database_demo_mongo_samples(
     mongo_db: Database = Depends(get_mongodb),
     current_user: dict = Depends(get_current_user),
 ):
+    raw_document = mongo_db.raw_trial_documents.find_one({}, {"_id": 0})
+    parsed_document = mongo_db.parsed_criteria_documents.find_one(
+        {},
+        {"_id": 0, "criteria_items": {"$slice": 3}},
+    )
+
     return {
-        "raw_trial_document": mongo_db.raw_trial_documents.find_one({}, {"_id": 0}),
-        "parsed_criteria_document": mongo_db.parsed_criteria_documents.find_one(
-            {},
-            {"_id": 0, "criteria_items": {"$slice": 3}},
-        ),
-        "patient_match_explanation": mongo_db.patient_match_explanations.find_one({}, {"_id": 0}),
-        "criteria_annotation": mongo_db.criteria_annotations.find_one({}, {"_id": 0}),
+        "raw_trial_document": raw_document,
+        "parsed_criteria_document": parsed_document,
+        "document_model_summary": {
+            "raw_trial_documents": "One document preserves the source dataset fields for each trial.",
+            "parsed_criteria_documents": "One document groups nested eligibility criteria items for each trial.",
+            "crud_demo": "The frontend MongoDB tab reads source documents and creates, updates, and deletes nested parsed criteria items.",
+        },
     }
 
 @router.get("/database-demo/views")

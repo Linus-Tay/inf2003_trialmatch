@@ -7,16 +7,27 @@ import pymysql
 from dotenv import load_dotenv
 from tqdm import tqdm
 
+### Project paths
+### ROOT_DIR points to the main project folder, while BASE_DIR points to this database/ETL area.
+### Keeping these as Path objects makes the script safer across Windows, Mac, and Linux.
 ROOT_DIR = Path(__file__).resolve().parents[2]
 BASE_DIR = Path(__file__).resolve().parents[1]
+
+### Load database settings from the project .env file.
+### The script still has fallback values below, so it can run locally even if some values are missing.
 load_dotenv(ROOT_DIR / ".env")
+
+### Source CSV files used by the MariaDB importer.
 TRIALS_CSV = BASE_DIR / "data" / "trials_clean.csv"
 CRITERIA_CSV = BASE_DIR / "data" / "eligibility_criteria_chunks.csv"
 
+### Importing in chunks avoids loading the full Kaggle dataset into memory at once.
 BATCH_SIZE = 1000
 
 
 def get_connection():
+    ### Centralised MariaDB connection helper.
+    ### autocommit is disabled because each import function commits after a safe batch is inserted.
     return pymysql.connect(
         host=os.getenv("MARIADB_HOST", "localhost"),
         port=int(os.getenv("MARIADB_PORT", "3307")),
@@ -32,12 +43,9 @@ def get_connection():
 
 
 def parse_optional_limit(env_name: str) -> int | None:
-    """Read an optional import limit from .env.
-
-    Empty, missing, "none", or "null" means full import. This allows fast
-    development imports and full final imports using the same script.
-    """
-
+    ### Reads an optional import limit from .env.
+    ### Example: TRIAL_IMPORT_LIMIT=5000 is useful for quick testing.
+    ### Empty, missing, "none", "null", or "all" means the script imports the full dataset.
     raw = os.getenv(env_name)
     if raw is None or raw.strip().lower() in {"", "none", "null", "all"}:
         return None
@@ -46,6 +54,7 @@ def parse_optional_limit(env_name: str) -> int | None:
 
 
 def clean_text(value):
+    ### Converts NaN/blank values into None so MariaDB receives proper NULL values.
     if pd.isna(value):
         return None
 
@@ -54,12 +63,8 @@ def clean_text(value):
 
 
 def normalise_name(value):
-    """Normalize names for duplicate-safe lookup tables.
-
-    This lowers case and collapses repeated whitespace so values such as
-    "Breast Cancer", "breast cancer", and "breast   cancer" map to one row.
-    """
-
+    ### Creates a duplicate-safe version of condition/intervention names.
+    ### For example, "Breast Cancer", "breast cancer", and "breast   cancer" become the same key.
     text = clean_text(value)
     if text is None:
         return None
@@ -70,8 +75,7 @@ def normalise_name(value):
 
 
 def parse_bool(value):
-    """Convert source TRUE/FALSE style values into SQL booleans."""
-
+    ### Converts common TRUE/FALSE style CSV values into Python booleans for SQL insertion.
     text = clean_text(value)
     if text is None:
         return None
@@ -85,6 +89,8 @@ def parse_bool(value):
 
 
 def parse_int(value):
+    ### Safely converts numeric-looking values into integers.
+    ### float() is used first because CSV values sometimes arrive as strings like "12.0".
     text = clean_text(value)
     if text is None:
         return None
@@ -96,15 +102,9 @@ def parse_int(value):
 
 
 def parse_age_to_years(value):
-    """Convert ClinicalTrials-style age strings into clean integer years.
-
-    The trials table intentionally enforces ages between 0 and 120 because
-    TrialMatch patient profiles also use a realistic 0-120 age range. Some
-    source datasets contain placeholder upper ages such as "999 Years" to
-    mean "no practical upper limit". Those should not be inserted as real
-    human ages, so values above 120 are stored as NULL instead.
-    """
-
+    ### Converts ClinicalTrials-style age strings into clean integer years.
+    ### The trials table uses a realistic 0-120 range, matching the patient profile logic.
+    ### Placeholder values such as "999 Years" are treated as unknown instead of real ages.
     if pd.isna(value):
         return None
 
@@ -136,13 +136,9 @@ def parse_age_to_years(value):
 
 
 def parse_trial_age_range(minimum_age_value, maximum_age_value):
-    """Return a database-safe trial age range.
-
-    If the source has an impossible range after cleaning, the upper bound is
-    treated as unknown instead of allowing the database CHECK constraint to
-    fail. The raw source text is still preserved in MongoDB for traceability.
-    """
-
+    ### Returns a database-safe minimum and maximum age range.
+    ### If cleaning creates an impossible range, the upper bound is treated as unknown.
+    ### This avoids failing the SQL CHECK constraint while keeping raw source text in MongoDB.
     minimum_age = parse_age_to_years(minimum_age_value)
     maximum_age = parse_age_to_years(maximum_age_value)
 
@@ -153,6 +149,7 @@ def parse_trial_age_range(minimum_age_value, maximum_age_value):
 
 
 def map_phase(raw_phase):
+    ### Maps raw ClinicalTrials phase codes into readable lookup table values.
     value = clean_text(raw_phase)
 
     if value is None:
@@ -174,6 +171,7 @@ def map_phase(raw_phase):
 
 
 def map_status(raw_status):
+    ### Maps raw trial status codes into the seeded MariaDB status lookup table.
     value = clean_text(raw_status)
 
     if value is None:
@@ -195,6 +193,7 @@ def map_status(raw_status):
 
 
 def map_study_type(raw_study_type):
+    ### Converts source study type values into the matching lookup table labels.
     value = clean_text(raw_study_type)
 
     if value is None:
@@ -210,6 +209,7 @@ def map_study_type(raw_study_type):
 
 
 def map_sex(raw_sex):
+    ### Normalises sex eligibility into one of the supported frontend/backend values.
     value = clean_text(raw_sex)
 
     if value is None:
@@ -225,6 +225,8 @@ def map_sex(raw_sex):
 
 
 def split_pipe_values(value):
+    ### The Kaggle source stores repeated values using pipes, such as "Cancer|Diabetes".
+    ### This helper turns those fields into clean individual values.
     text = clean_text(value)
 
     if text is None:
@@ -238,6 +240,8 @@ def split_pipe_values(value):
 
 
 def extract_simple_keywords(text):
+    ### Lightweight keyword tagging for the criteria table.
+    ### This is intentionally simple and explainable for database demonstration purposes.
     important_terms = [
         "cancer", "diabetes", "hypertension", "pregnant", "pregnancy",
         "kidney", "liver", "heart", "severe", "history", "allergy",
@@ -254,11 +258,13 @@ def extract_simple_keywords(text):
 
 
 def contains_manual_review_terms(text):
+    ### Flags criteria that probably need human review because they are subjective or clinical.
     lowered = text.lower()
     return any(term in lowered for term in ["severe", "history of", "clinically significant", "investigator"])
 
 
 def get_lookup_maps(conn):
+    ### Loads lookup table IDs once, so later import rows can reference IDs instead of text labels.
     with conn.cursor() as cursor:
         cursor.execute("SELECT phase_id, phase_name FROM trial_phases")
         phases = {row["phase_name"]: row["phase_id"] for row in cursor.fetchall()}
@@ -276,6 +282,8 @@ def get_lookup_maps(conn):
 
 
 def import_trials(conn, limit=None):
+    ### Imports the main trials table first because other tables depend on trial_id.
+    ### ON DUPLICATE KEY UPDATE keeps the importer safe to rerun during development.
     print("Importing trials into MariaDB...")
 
     phases, statuses, study_types, sexes = get_lookup_maps(conn)
@@ -295,6 +303,7 @@ def import_trials(conn, limit=None):
             nct_id = clean_text(row.get("nct_id"))
             title = clean_text(row.get("title"))
 
+            ### nct_id and title are required for a useful trial record.
             if not nct_id or not title:
                 continue
 
@@ -354,6 +363,7 @@ def import_trials(conn, limit=None):
         conn.commit()
         total_imported += len(rows)
 
+    ### Build this map after importing trials so later tables can link by trial_id.
     with conn.cursor() as cursor:
         cursor.execute("SELECT trial_id, nct_id FROM trials")
         nct_to_trial_id = {
@@ -366,6 +376,7 @@ def import_trials(conn, limit=None):
 
 
 def import_trial_source_metadata(conn, nct_to_trial_id, limit=None):
+    ### Stores source-level metadata that supports search, evidence, and traceability screens.
     print("Importing source metadata into MariaDB...")
 
     df_iter = pd.read_csv(TRIALS_CSV, chunksize=BATCH_SIZE)
@@ -434,6 +445,8 @@ def import_trial_source_metadata(conn, nct_to_trial_id, limit=None):
 
 
 def import_conditions_and_interventions(conn, nct_to_trial_id, limit=None):
+    ### Imports many-to-many trial links for conditions and interventions.
+    ### Conditions/interventions are normalised first, then linked through junction tables.
     print("Importing conditions and interventions...")
 
     df_iter = pd.read_csv(TRIALS_CSV, chunksize=BATCH_SIZE)
@@ -514,6 +527,8 @@ def import_conditions_and_interventions(conn, nct_to_trial_id, limit=None):
 
 
 def import_criteria(conn, nct_to_trial_id, limit=None):
+    ### Imports eligibility criteria chunks after trials are already available.
+    ### Each criterion gets a simple keyword count, complexity score, and manual-review flag.
     print("Importing eligibility criteria chunks...")
 
     df_iter = pd.read_csv(CRITERIA_CSV, chunksize=BATCH_SIZE)
@@ -579,8 +594,8 @@ def import_criteria(conn, nct_to_trial_id, limit=None):
 
 
 def refresh_performance_cache(conn):
-    """Refresh aggregate cache tables after full import."""
-
+    ### Rebuilds aggregate cache tables after import.
+    ### These tables make dashboard/search counts faster and also demonstrate database optimisation.
     print("Refreshing trial and condition cache tables...")
     with conn.cursor() as cursor:
         cursor.execute(
@@ -638,6 +653,8 @@ def refresh_performance_cache(conn):
 
 
 def main():
+    ### Main import flow.
+    ### Order matters: trials must be imported before metadata, links, and criteria can reference them.
     conn = get_connection()
 
     try:
@@ -652,6 +669,7 @@ def main():
 
         print("MariaDB import completed.")
     finally:
+        ### Always close the database connection, even if one import step fails.
         conn.close()
 
 

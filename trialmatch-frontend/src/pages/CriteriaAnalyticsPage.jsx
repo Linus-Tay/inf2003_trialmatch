@@ -15,9 +15,9 @@ export default function CriteriaAnalyticsPage() {
     <div className="space-y-6">
       <PageHeader
         icon={LineChart}
-        eyebrow="Eligibility Criteria Analytics"
-        title="Analyse criteria strictness, complexity and manual review signals."
-        description="This module highlights eligibility_complexity_view and the criteria table as an analytics feature."
+        eyebrow="Criteria Insights"
+        title="Eligibility criteria analytics"
+        description="Analyse criteria complexity, strictness and review signals."
       />
 
       <section className="grid gap-4 md:grid-cols-4">
@@ -38,11 +38,11 @@ export default function CriteriaAnalyticsPage() {
           {(data.strict_trials || []).map((trial) => (
             <div key={trial.trial_id} className="rounded-2xl bg-white/75 p-4">
               <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                <div>
+                <div className="md:w-10/12">
                   <p className="text-sm text-slate-500">{trial.nct_id}</p>
                   <p className="font-semibold text-slate-950">{trial.brief_title}</p>
                 </div>
-                <p className="rounded-full bg-blue-50 px-3 py-1 text-sm font-bold text-blue-700">Complexity {trial.avg_complexity_score}</p>
+                <p className="rounded-full md:w-2/12 text-center bg-blue-50 px-3 py-1 text-sm font-bold text-blue-700">Complexity {trial.avg_complexity_score}</p>
               </div>
             </div>
           ))}

@@ -12,7 +12,6 @@ import {
   LogOut,
   Menu,
   Search,
-  ShieldAlert,
   UserRoundSearch,
   X,
 } from "lucide-react";
@@ -35,13 +34,12 @@ const navGroups = [
   {
     title: "Research/Admin",
     items: [
-      { to: "/management", label: "Trial Management", icon: ClipboardList },
-      { to: "/analytics", label: "Clinical Analytics", icon: BarChart3 },
-      { to: "/criteria-analytics", label: "Criteria Analytics", icon: LineChart },
-      { to: "/data-quality", label: "Data Quality", icon: ShieldAlert },
-      { to: "/database-demo", label: "Database Demo", icon: FileSearch },
+      { to: "/management", label: "Trial Management", icon: ClipboardList, adminOnly: true },
+      { to: "/analytics", label: "Clinical Analytics", icon: BarChart3, adminOnly: true },
+      { to: "/criteria-analytics", label: "Criteria Analytics", icon: LineChart, adminOnly: true },
+      { to: "/database-demo", label: "Database Demo", icon: FileSearch, adminOnly: true },
     ],
-  },
+  }
 ];
 
 export default function AppLayout() {
@@ -50,6 +48,15 @@ export default function AppLayout() {
   const [showProfile, setShowProfile] = useState(false);
 
   const { user, logout } = useAuth();
+  const isAdmin = String(user?.role_name || "").toLowerCase() === "admin";
+
+  const visibleNavGroups = navGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => !item.adminOnly || isAdmin),
+    }))
+    .filter((group) => group.items.length > 0);
+    
   const navigate = useNavigate();
 
   function handleLogout() {
@@ -61,7 +68,7 @@ export default function AppLayout() {
   function renderNavLinks({ isMobile = false } = {}) {
     return (
       <nav className={`${isMobile ? "mt-8 space-y-7" : "mt-8 max-h-[calc(100vh-260px)] space-y-7 overflow-y-auto pb-4"}`}>
-        {navGroups.map((group) => (
+        {visibleNavGroups.map((group) => (
           <div key={group.title}>
             {(!collapsed || isMobile) && (
               <p className="mb-2 px-3 text-xs font-bold uppercase tracking-[0.22em] text-slate-400">
