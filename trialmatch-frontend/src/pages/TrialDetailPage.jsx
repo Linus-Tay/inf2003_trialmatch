@@ -246,7 +246,6 @@ export default function TrialDetailPage() {
           <Panel
             title="MongoDB trace"
             icon={Database}
-            helper="Useful for showing NoSQL evidence in your demo, but kept collapsed so it does not dominate the page."
           >
             <div className="min-w-0 space-y-3">
               <div className="grid gap-3 sm:grid-cols-2">

@@ -191,63 +191,6 @@ export async function fetchDatabaseDemoOverview() {
   return response.data;
 }
 
-/*
-  Used by DatabaseDemoPage.
-  This is frontend-safe static relationship evidence.
-  It prevents an import error and avoids needing a backend route.
-*/
-export async function fetchDatabaseRelationships() {
-  return {
-    core_relationships: [
-      {
-        parent_table: "trials",
-        child_table: "eligibility_criteria",
-        relationship: "One trial has many eligibility criteria rows",
-        join_key: "trials.trial_id = eligibility_criteria.trial_id",
-      },
-      {
-        parent_table: "trials",
-        child_table: "trial_conditions",
-        relationship: "One trial can have many linked conditions",
-        join_key: "trials.trial_id = trial_conditions.trial_id",
-      },
-      {
-        parent_table: "trials",
-        child_table: "trial_interventions",
-        relationship: "One trial can have many linked interventions",
-        join_key: "trials.trial_id = trial_interventions.trial_id",
-      },
-      {
-        parent_table: "app_users",
-        child_table: "saved_trials",
-        relationship: "One user can save many trials",
-        join_key: "app_users.user_id = saved_trials.user_id",
-      },
-      {
-        parent_table: "patient_profiles",
-        child_table: "patient_trial_matches",
-        relationship: "One patient profile can have many trial match results",
-        join_key:
-          "patient_profiles.profile_id = patient_trial_matches.profile_id",
-      },
-    ],
-    join_samples: [
-      {
-        demonstration: "Trial detail page",
-        tables_used:
-          "trials, trial_conditions, trial_interventions, eligibility_criteria",
-      },
-      {
-        demonstration: "Saved trials workflow",
-        tables_used: "app_users, saved_trials, trials",
-      },
-      {
-        demonstration: "Patient matching workflow",
-        tables_used: "patient_profiles, patient_trial_matches, trials",
-      },
-    ],
-  };
-}
 
 export async function fetchDatabaseViews() {
   const response = await api.get("/database-demo/views");

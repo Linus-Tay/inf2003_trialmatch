@@ -627,10 +627,6 @@ function MatchCard({ match, isSaved, isSaving, onToggleSavedTrial }) {
             <p className="text-3xl font-bold">{formatScore(match.match_score)}</p>
           </div>
 
-          <div className="rounded-3xl bg-slate-50 px-4 py-4 text-center">
-            <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Match ID</p>
-            <p className="mt-1 text-lg font-bold text-slate-800">{match.match_id || "—"}</p>
-          </div>
         </div>
       </div>
     </article>
